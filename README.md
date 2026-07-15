@@ -154,7 +154,7 @@ uv run python -m eval_scripts.eval_ebs_main_experiment \
   --experience_file "exp/experiences 600-300.json"
 ```
 
-XSTest only:
+XSTest:
 
 ```bash
 uv run python -m eval_scripts.eval_ebs_main_experiment \
