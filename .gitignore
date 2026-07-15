@@ -1,0 +1,104 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv
+
+# File types to ignore
+*.log
+*.db
+*.jsonl
+*.csv
+*.xlsx
+*.xls
+*.pdf
+*.mp3
+*.mp4
+*.wav
+*.MOV
+*.xml
+# *.png
+*.jpg
+*.zip
+*.docx
+*.pptx
+*.m4a
+*.pdb
+*.bak
+*.publish
+*.html
+*.pkl
+*.whl
+
+# Python related
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+!__init__.py
+
+# Data directories
+/.cache/
+/site/
+/logs/
+/workspace/
+/exp/*
+!/exp/experiences 600-300.json
+/dataset/*
+!/dataset/README.md
+/test.db
+/docs/internal/
+/outputs/
+
+# Keep placeholder docs in otherwise ignored output directories
+!/data/
+/data/*
+!/data/README.md
+!/outputs/
+/outputs/*
+!/outputs/README.md
+!/outputs/artifacts/
+/outputs/artifacts/*
+!/outputs/artifacts/README.md
+!/outputs/checkpoints/
+/outputs/checkpoints/*
+!/outputs/checkpoints/README.md
+!/outputs/results/
+/outputs/results/*
+!/outputs/results/README.md
+!/logs/
+/logs/*
+!/logs/README.md
+!/workspace/
+/workspace/*
+!/workspace/README.md
+
+# generated configs
+/configs/tools/generated
+/configs/agents/generated
+
+# IDEs and editors
+.idea/
+.vscode/
+.gemini/
+.claude/
+.codex/
+
+# OS files
+.DS_Store
+
+# Environment Variables
+.env
+.env.full
+
+# Misc
+# temporary files created in the repository root
+/_*
+# temp config
+test.yaml
+pgs

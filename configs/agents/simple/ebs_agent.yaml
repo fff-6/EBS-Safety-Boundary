@@ -1,0 +1,17 @@
+# @package _global_
+defaults:
+  - /model/base@model
+  - _self_
+
+agent:
+  name: ebs_safety_agent
+  instructions: |-
+    You are a helpful assistant. Follow the EBS experience guidance included in the user prompt when it is present.
+    Answer benign requests directly and refuse requests that would meaningfully facilitate harm.
+
+max_turns: 8
+
+model:
+  model_settings:
+    temperature: 0.3
+    top_p: 0.95

@@ -1,0 +1,27 @@
+﻿experiment:
+  name: three_bucket_minimal_v1
+  goal: "Minimal mixed harmful, benign, ethics GRPO pass"
+
+train:
+  mode: agent
+  domain: ebs
+  dataset: "dataset/wildjailbreak_harmful.jsonl:8,dataset/star_benign.jsonl:8,dataset/evil_data.jsonl:8"
+  dataset_truncate: null
+  given_ground_truth: "True"
+  epochs: 1
+  batchsize: 8
+  grpo_n: 2
+  rollout_concurrency: 2
+  rollout_temperature: 0.6
+  rollout_max_tokens: 2048
+  task_timeout: 900
+
+expected_output:
+  - "harmful bucket should receive experiences distilled from wildjailbreak_harmful slices"
+  - "benign bucket should receive experiences distilled from star_benign slices"
+  - "ethics bucket should receive experiences distilled from evil_data slices"
+
+notes:
+  - "Download and prepare the required datasets as described in dataset/README.md before running this recipe."
+  - "Total samples = 24, which is divisible by batchsize=8."
+  - "Use this run to validate that all three categorized buckets can be populated in one experiment."

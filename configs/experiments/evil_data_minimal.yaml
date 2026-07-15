@@ -1,0 +1,22 @@
+﻿experiment:
+  name: evil_data_minimal_v1
+  goal: "Minimal runnable ethics experience generation pass on evil_data"
+
+train:
+  mode: agent
+  domain: ebs
+  dataset: dataset/evil_data.jsonl
+  dataset_truncate: 16
+  given_ground_truth: "True"
+  epochs: 1
+  batchsize: 8
+  grpo_n: 2
+  rollout_concurrency: 2
+  rollout_temperature: 0.6
+  rollout_max_tokens: 2048
+  task_timeout: 900
+
+notes:
+  - "dataset_truncate must stay divisible by batchsize because train.py asserts this."
+  - "This is a smoke-size run for validating the new ethics bucket and categorized experience generation path."
+  - "After this run succeeds, scale up dataset_truncate, grpo_n, and rollout_concurrency."

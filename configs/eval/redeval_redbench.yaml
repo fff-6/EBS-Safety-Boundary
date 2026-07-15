@@ -1,0 +1,61 @@
+target:
+  provider: openai
+  model: Qwen/Qwen3-8B
+  base_url: https://api.siliconflow.cn/v1
+  api_key_env: TARGET_LLM_API_KEY
+  temperature: 0.6
+  top_p: 0.9
+  max_tokens: 256
+  request_interval_seconds: 0.6
+  max_model_len: 4096
+  gpu_memory_utilization: 0.8
+
+attack_judge:
+  provider: openai
+  model: Qwen/Qwen3-14B
+  base_url: https://api.siliconflow.cn/v1
+  api_key_env: ATTACK_JUDGE_API_KEY
+  temperature: 0.2
+  top_p: 0.9
+  max_tokens: 16
+  request_interval_seconds: 0.6
+  max_model_len: 4352
+  gpu_memory_utilization: 0.9
+
+refuse_judge:
+  provider: openai
+  model: Qwen/Qwen3-14B
+  base_url: https://api.siliconflow.cn/v1
+  api_key_env: OPENAI_API_KEY
+  temperature: 0.2
+  top_p: 0.9
+  max_tokens: 16
+  request_interval_seconds: 0.6
+  max_model_len: 4096
+  gpu_memory_utilization: 0.8
+
+judge:
+  provider: openai
+  model: Qwen/Qwen3-14B
+  base_url: https://api.siliconflow.cn/v1
+  api_key_env: OPENAI_API_KEY
+  temperature: 0.2
+  top_p: 0.9
+  max_tokens: 16
+  request_interval_seconds: 0.6
+  max_model_len: 4096
+  gpu_memory_utilization: 0.8
+
+defaults:
+  harmful_benchmarks:
+    - HarmBench
+  benign_benchmarks:
+   # - CoCoNot
+   # - ORBench
+   # - SGXSTest
+    - XSTest
+  attack_methods:
+    - direct
+  #  - human_jailbreak
+  #  - zeroshot
+  human_jailbreak_subsets: 1
