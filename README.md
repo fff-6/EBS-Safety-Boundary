@@ -6,11 +6,47 @@ Follow the steps below to configure the environment, build an experience bank, a
 
 ### 1. Setup
 
-Install the locked dependencies in the project root:
+Requirements:
+
+- Python 3.12 or later (required by this implementation)
+- Git
+- `uv`
+
+Clone the repository and enter the project directory:
+
+```bash
+git clone https://github.com/fff-6/EBS-Safety-Boundary.git
+cd EBS-Safety-Boundary
+```
+
+Check Python and install `uv` if it is not already available:
+
+```bash
+python --version
+python -m pip install --upgrade uv
+uv --version
+```
+
+Create the local `.venv` and install the dependencies recorded in `uv.lock`:
 
 ```bash
 uv sync
 ```
+
+All commands below use `uv run`, so activating the virtual environment is optional. To activate it manually, use:
+
+```powershell
+# PowerShell
+.\.venv\Scripts\Activate.ps1
+```
+
+```bash
+# Linux or macOS
+source .venv/bin/activate
+```
+
+Use the environment created by `uv`; avoid installing the project dependencies into a separate Conda or system
+environment.
 
 Copy the environment template. On PowerShell:
 
@@ -24,25 +60,32 @@ On Linux or macOS:
 cp .env.example .env
 ```
 
-Edit `.env` and configure the target and judge models. The main paper setup uses:
+Edit `.env` and configure the target and judge models. The defaults below match the paper's main model setup:
 
 ```ini
 EBS_LLM_TYPE=chat.completions
 EBS_LLM_MODEL=Qwen/Qwen3-8B
-EBS_LLM_BASE_URL=https://api.siliconflow.cn/v1
+EBS_LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
 EBS_LLM_API_KEY=replace-me
 
 TARGET_LLM_MODEL=Qwen/Qwen3-8B
-TARGET_LLM_BASE_URL=https://api.siliconflow.cn/v1
+TARGET_LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
 TARGET_LLM_API_KEY=replace-me
 
 EBS_JUDGE_MODEL=Qwen/Qwen3-14B
-EBS_JUDGE_BASE_URL=https://api.siliconflow.cn/v1
+EBS_JUDGE_BASE_URL=https://your-openai-compatible-endpoint/v1
 EBS_JUDGE_API_KEY=replace-me
 
 ATTACK_JUDGE_API_KEY=replace-me
 OPENAI_API_KEY=replace-me
 ```
+
+The paper uses Qwen3-8B as the main target model and Qwen3-14B as the automatic judge. Replace the example URLs and
+keys with any hosted service or local endpoint that supports OpenAI-compatible Chat Completions. Python 3.12 is the
+source-code requirement, not a hardware claim from the paper.
+
+For reference, the paper reports Ubuntu 22.x, an NVIDIA GeForce RTX 4060, and 32 GB RAM. Matching this hardware is
+not required when the target and judge models are accessed through APIs; local inference requires suitable GPU memory.
 
 Run the tests:
 

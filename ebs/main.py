@@ -59,12 +59,14 @@ def _looks_like_qwen_model(model_name: str | None) -> bool:
 
 
 def _apply_qwen_judge_defaults(args: argparse.Namespace) -> None:
-    """Default Qwen judges to SiliconFlow when base URL / key are not passed explicitly."""
+    """Reuse target endpoint credentials for Qwen judges when not passed explicitly."""
 
     if not _looks_like_qwen_model(args.judge_model):
         return
     if not args.judge_base_url:
-        os.environ.setdefault("EBS_JUDGE_BASE_URL", os.getenv("TARGET_LLM_BASE_URL", "https://api.siliconflow.cn/v1"))
+        target_base_url = os.getenv("TARGET_LLM_BASE_URL")
+        if target_base_url:
+            os.environ.setdefault("EBS_JUDGE_BASE_URL", target_base_url)
     if not args.judge_api_key:
         os.environ.setdefault("EBS_JUDGE_API_KEY", os.getenv("TARGET_LLM_API_KEY", ""))
 

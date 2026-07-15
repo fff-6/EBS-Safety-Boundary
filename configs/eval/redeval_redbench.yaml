@@ -1,7 +1,8 @@
 target:
   provider: openai
   model: Qwen/Qwen3-8B
-  base_url: https://api.siliconflow.cn/v1
+  base_url: https://your-openai-compatible-endpoint/v1
+  base_url_env: TARGET_LLM_BASE_URL
   api_key_env: TARGET_LLM_API_KEY
   temperature: 0.6
   top_p: 0.9
@@ -13,7 +14,8 @@ target:
 attack_judge:
   provider: openai
   model: Qwen/Qwen3-14B
-  base_url: https://api.siliconflow.cn/v1
+  base_url: https://your-openai-compatible-endpoint/v1
+  base_url_env: EBS_JUDGE_BASE_URL
   api_key_env: ATTACK_JUDGE_API_KEY
   temperature: 0.2
   top_p: 0.9
@@ -25,7 +27,8 @@ attack_judge:
 refuse_judge:
   provider: openai
   model: Qwen/Qwen3-14B
-  base_url: https://api.siliconflow.cn/v1
+  base_url: https://your-openai-compatible-endpoint/v1
+  base_url_env: EBS_JUDGE_BASE_URL
   api_key_env: OPENAI_API_KEY
   temperature: 0.2
   top_p: 0.9
@@ -37,7 +40,8 @@ refuse_judge:
 judge:
   provider: openai
   model: Qwen/Qwen3-14B
-  base_url: https://api.siliconflow.cn/v1
+  base_url: https://your-openai-compatible-endpoint/v1
+  base_url_env: EBS_JUDGE_BASE_URL
   api_key_env: OPENAI_API_KEY
   temperature: 0.2
   top_p: 0.9

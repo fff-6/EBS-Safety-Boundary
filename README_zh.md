@@ -6,11 +6,46 @@
 
 ### 1. 安装环境
 
-在项目根目录安装依赖：
+环境要求：
+
+- Python 3.12 及以上（本项目源码要求）
+- Git
+- `uv`
+
+克隆仓库并进入项目目录：
+
+```bash
+git clone https://github.com/fff-6/EBS-Safety-Boundary.git
+cd EBS-Safety-Boundary
+```
+
+检查 Python 版本；如果尚未安装 `uv`，使用 pip 安装：
+
+```bash
+python --version
+python -m pip install --upgrade uv
+uv --version
+```
+
+根据 `uv.lock` 创建项目虚拟环境 `.venv` 并安装依赖：
 
 ```bash
 uv sync
 ```
+
+后续命令均使用 `uv run`，因此不必手动激活虚拟环境。如需激活，PowerShell 使用：
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Linux 或 macOS 使用：
+
+```bash
+source .venv/bin/activate
+```
+
+建议统一使用 `uv` 创建的环境，不要再将项目依赖混装到其他 Conda 环境或系统 Python 中。
 
 复制环境变量模板：
 
@@ -24,25 +59,32 @@ Linux 或 macOS：
 cp .env.example .env
 ```
 
-编辑 `.env`，配置目标模型和 Judge。论文主要使用：
+编辑 `.env`，配置目标模型和 Judge。以下默认模型与论文主实验一致：
 
 ```ini
 EBS_LLM_TYPE=chat.completions
 EBS_LLM_MODEL=Qwen/Qwen3-8B
-EBS_LLM_BASE_URL=https://api.siliconflow.cn/v1
+EBS_LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
 EBS_LLM_API_KEY=replace-me
 
 TARGET_LLM_MODEL=Qwen/Qwen3-8B
-TARGET_LLM_BASE_URL=https://api.siliconflow.cn/v1
+TARGET_LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
 TARGET_LLM_API_KEY=replace-me
 
 EBS_JUDGE_MODEL=Qwen/Qwen3-14B
-EBS_JUDGE_BASE_URL=https://api.siliconflow.cn/v1
+EBS_JUDGE_BASE_URL=https://your-openai-compatible-endpoint/v1
 EBS_JUDGE_API_KEY=replace-me
 
 ATTACK_JUDGE_API_KEY=replace-me
 OPENAI_API_KEY=replace-me
 ```
+
+论文主实验使用 Qwen3-8B 作为目标模型，Qwen3-14B 作为自动 Judge。请将示例 URL 和 API Key 替换为任意
+支持 OpenAI-compatible Chat Completions 的托管服务或本地接口。Python 3.12 是源码运行要求，不是论文对
+实验硬件的限定。
+
+论文记录的实验环境为 Ubuntu 22.x、NVIDIA GeForce RTX 4060 和 32 GB 内存。通过 API 调用目标模型和 Judge
+时不要求使用相同硬件；只有本地推理时才需要根据模型大小准备相应的显存。
 
 运行测试：
 

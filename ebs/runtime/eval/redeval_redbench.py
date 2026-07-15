@@ -392,6 +392,18 @@ def _resolve_api_key(mapping: dict[str, Any]) -> str | None:
     return None
 
 
+def _resolve_base_url(mapping: dict[str, Any]) -> str | None:
+    """Resolve an OpenAI-compatible endpoint from environment or YAML."""
+
+    base_url_env = mapping.get("base_url_env")
+    if base_url_env:
+        env_value = os.getenv(str(base_url_env))
+        if env_value:
+            return env_value
+    base_url = mapping.get("base_url")
+    return str(base_url) if base_url else None
+
+
 class OpenAICompatibleLLM:
     """Minimal OpenAI-compatible client used to avoid importing upstream vllm bindings."""
 
@@ -591,7 +603,7 @@ def build_model_config_from_mapping(mapping: dict[str, Any]) -> ModelConfig:
         provider=str(mapping["provider"]),
         model=str(mapping["model"]),
         api_key=_resolve_api_key(mapping),
-        base_url=mapping.get("base_url"),
+        base_url=_resolve_base_url(mapping),
         temperature=float(mapping.get("temperature", 0.6)),
         top_p=float(mapping.get("top_p", 0.9)),
         max_tokens=int(mapping.get("max_tokens", 1024)),
