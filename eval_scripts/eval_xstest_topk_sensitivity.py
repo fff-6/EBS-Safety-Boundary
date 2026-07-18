@@ -22,13 +22,14 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from ebs.core.experience_bank import format_experiences_for_prompt, select_experiences  # noqa: E402
 from eval_scripts.eval_ebs_main_experiment import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
     DEFAULT_EXPERIENCE_TOKEN_BUDGET,
     DEFAULT_TARGET_MODEL,
+    MAIN_ATTACK_METHODS,
     MAIN_BENIGN_BENCHMARK,
     MAIN_HARMFUL_BENCHMARK,
-    MAIN_ATTACK_METHODS,
     ModelConfig,
     RedEvalRunConfig,
     _build_model_config,
@@ -38,7 +39,6 @@ from eval_scripts.eval_ebs_main_experiment import (  # noqa: E402
     run_redeval_redbench,
     save_main_metric_outputs,
 )
-from ebs.core.experience_bank import format_experiences_for_prompt, select_experiences  # noqa: E402
 
 DEFAULT_OUTPUT_DIR = os.path.join("data", "ebs", "eval", "xstest_topk_sensitivity")
 DEFAULT_K_VALUES = (0, 4, 8, 12, 16)
@@ -112,9 +112,7 @@ def _build_target_model(args: argparse.Namespace, default_mapping: dict[str, Any
         else int(default_mapping.get("max_tokens", args.target_max_tokens)),
         max_model_len=args.target_max_model_len
         if "--target_max_model_len" in sys.argv
-        else (
-            int(default_mapping["max_model_len"]) if default_mapping.get("max_model_len") is not None else None
-        ),
+        else (int(default_mapping["max_model_len"]) if default_mapping.get("max_model_len") is not None else None),
         gpu_memory_utilization=args.target_gpu_memory_utilization
         if "--target_gpu_memory_utilization" in sys.argv
         else (
@@ -132,7 +130,9 @@ def _load_json(path: Path) -> Any:
 
 
 def _find_eval_results(run_dir: Path, split_name: str, model_output_name: str) -> Path:
-    path = run_dir / "logs" / "xstest_official" / split_name / "XSTest" / "base" / model_output_name / "eval_results.json"
+    path = (
+        run_dir / "logs" / "xstest_official" / split_name / "XSTest" / "base" / model_output_name / "eval_results.json"
+    )
     if not path.exists():
         raise FileNotFoundError(f"Missing eval results for split={split_name}: {path}")
     return path
@@ -142,7 +142,6 @@ def _build_selected_rule_metadata(
     *,
     experience_bank: dict[str, dict[str, str]],
     query: str,
-    harmful_label: int,
     k_value: int,
     token_budget: int,
     tokenizer: tiktoken.Encoding,
@@ -158,7 +157,6 @@ def _build_selected_rule_metadata(
     selected_bucket, selected = select_experiences(
         experience_bank,
         problem=query,
-        harmful_label=harmful_label,
         max_experiences=k_value,
         token_budget=token_budget,
     )
@@ -364,7 +362,6 @@ def main() -> None:
                 metadata = _build_selected_rule_metadata(
                     experience_bank=experience_bank,
                     query=str(point["query"]),
-                    harmful_label=int(point["harmful_label"]),
                     k_value=k_value,
                     token_budget=args.experience_token_budget,
                     tokenizer=tokenizer,
@@ -408,7 +405,17 @@ def main() -> None:
     _write_csv(
         per_sample_csv_path,
         per_sample_rows,
-        ["sample_id", "subset", "K", "input", "retrieved_rule_ids", "num_exp_tokens", "response", "latency", "judge_label"],
+        [
+            "sample_id",
+            "subset",
+            "K",
+            "input",
+            "retrieved_rule_ids",
+            "num_exp_tokens",
+            "response",
+            "latency",
+            "judge_label",
+        ],
     )
     print(f"[topk] saved aggregate CSV to {aggregate_csv_path}")
     print(f"[topk] saved per-sample CSV to {per_sample_csv_path}")

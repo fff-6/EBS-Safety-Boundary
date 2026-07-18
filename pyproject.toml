@@ -151,6 +151,7 @@ isort = { combine-as-imports = true, known-first-party = ["ebs"] }
 "ebs/runtime/eval/redeval_redbench.py" = ["E501"]
 "ebs/train.py" = ["E402"]
 "eval_scripts/eval_ebs_main_experiment.py" = ["E501"]
+"eval_scripts/eval_orbench_hard1k.py" = ["E501"]
 "eval_scripts/eval_xstest_boundary_stability.py" = ["E501"]
 
 [tool.ruff.lint.pydocstyle]

@@ -75,7 +75,7 @@ _HELPERS = _load_redeval_helpers()
 DEFAULT_CONFIG_PATH = _HELPERS.DEFAULT_CONFIG_PATH
 EVALUATE_REFUSAL_TEMPLATE = _HELPERS.EVALUATE_REFUSAL_TEMPLATE
 ModelConfig = _HELPERS.ModelConfig
-apply_xstest_experience_prompt = _HELPERS.apply_xstest_experience_prompt
+apply_experience_prompt = _HELPERS.apply_experience_prompt
 load_experience_text = _HELPERS.load_experience_text
 load_redeval_default_config = _HELPERS.load_redeval_default_config
 resolve_api_key = _HELPERS._resolve_api_key
@@ -146,13 +146,9 @@ def _build_model_config(
         model=model or default_mapping.get("model"),
         api_key=api_key if api_key is not None else resolve_api_key(default_mapping),
         base_url=base_url if base_url is not None else default_mapping.get("base_url"),
-        temperature=temperature
-        if temperature_flag in sys.argv
-        else float(default_mapping.get("temperature", 0.6)),
+        temperature=temperature if temperature_flag in sys.argv else float(default_mapping.get("temperature", 0.6)),
         top_p=top_p if top_p_flag in sys.argv else float(default_mapping.get("top_p", 0.9)),
-        max_tokens=max_tokens
-        if max_tokens_flag in sys.argv
-        else int(default_mapping.get("max_tokens", max_tokens)),
+        max_tokens=max_tokens if max_tokens_flag in sys.argv else int(default_mapping.get("max_tokens", max_tokens)),
         max_model_len=max_model_len
         if max_model_len_flag in sys.argv
         else (int(default_mapping["max_model_len"]) if default_mapping.get("max_model_len") is not None else None),
@@ -208,7 +204,9 @@ def _load_jsonl_records(path: Path) -> list[dict[str, Any]]:
                 continue
             payload = json.loads(stripped)
             if not isinstance(payload, dict):
-                raise ValueError(f"Expected JSON object per line in {path}, got {type(payload).__name__} at line {line_number}.")
+                raise ValueError(
+                    f"Expected JSON object per line in {path}, got {type(payload).__name__} at line {line_number}."
+                )
             payload.setdefault("_source_path", f"line:{line_number}")
             records.append(payload)
     return records
@@ -363,7 +361,7 @@ def build_input_prompt(
     experience_text: dict[str, dict[str, str]] | str | None,
 ) -> str:
     if method.lower() == "ebs":
-        return apply_xstest_experience_prompt(prompt, experience_text, harmful_label=0)
+        return apply_experience_prompt(prompt, experience_text)
     return prompt
 
 
@@ -526,7 +524,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run OR-Bench Hard-1K benign over-refusal evaluation with Vanilla or EBS prompting."
     )
-    parser.add_argument("--config_path", type=str, default=str(DEFAULT_CONFIG_PATH), help="Repo-level eval config path.")
+    parser.add_argument(
+        "--config_path", type=str, default=str(DEFAULT_CONFIG_PATH), help="Repo-level eval config path."
+    )
     parser.add_argument("--experiment_name", type=str, required=True, help="Experiment name used for output files.")
     parser.add_argument("--dataset_path", type=str, required=True, help="Local OR-Bench dataset path.")
     parser.add_argument(
@@ -684,7 +684,9 @@ def main() -> None:
     method = "EBS" if args.method.lower() == "ebs" else "Vanilla"
     experience_text = load_experience_text(args.experience_file) if method == "EBS" else None
     if method == "EBS" and not args.experience_file:
-        print("[orbench-hard1k] warning: method=EBS but no --experience_file was provided; prompts will behave like Vanilla.")
+        print(
+            "[orbench-hard1k] warning: method=EBS but no --experience_file was provided; prompts will behave like Vanilla."
+        )
 
     target_llm, target_sampling = target_model.build_llm()
     refusal_judge_llm, refusal_sampling = refuse_judge_model.build_llm()

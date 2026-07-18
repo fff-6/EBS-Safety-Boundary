@@ -32,15 +32,3 @@ retrieval:
   token_budget: 0
   embedding_backend: deterministic_hash
   embedding_dimension: 256
-
-evaluation:
-  target_temperature: 0.6
-  target_top_p: 0.9
-  target_max_tokens: 256
-  judge_temperature: 0.2
-  judge_top_p: 0.9
-  judge_max_tokens: 16
-  xstest_seeds: [42, 43, 44, 45, 46]
-  harmbench_samples: 320
-  xstest_safe_samples: 250
-  xstest_unsafe_contrast_samples: 200

@@ -1,5 +1,7 @@
 $ErrorActionPreference = "Stop"
 
+uv run python scripts/validate_experiment_inputs.py
+
 uv run python ebs/train.py `
   --mode agent `
   --domain ebs `

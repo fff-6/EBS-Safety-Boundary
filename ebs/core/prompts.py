@@ -96,10 +96,15 @@ def build_ebs_prompt(
     """Build the EBS prompt with the selected dynamic experiences."""
 
     selected_bucket, selected_experiences = select_experiences(experiences or {}, problem=problem, bucket=bucket)
-    formatted_experiences = format_experiences_for_prompt(selected_experiences)
+    return render_ebs_prompt(problem, selected_experiences, selected_bucket)
+
+
+def render_ebs_prompt(problem: str, experiences: dict[str, str], bucket: str) -> str:
+    """Render a prompt from experiences that have already been selected."""
+
     return PROBLEM_WITH_EXPERIENCE_TEMPLATE.format(
-        experience_bucket=format_bucket_for_prompt(selected_bucket),
-        experiences=formatted_experiences,
+        experience_bucket=format_bucket_for_prompt(bucket),
+        experiences=format_experiences_for_prompt(experiences),
         problem=problem,
     )
 
@@ -139,11 +144,7 @@ def build_ebs_prompt_with_metrics(
         mixed_retrieval = selection.mixed_retrieval
     retrieval_end = time.perf_counter()
 
-    prompt = PROBLEM_WITH_EXPERIENCE_TEMPLATE.format(
-        experience_bucket=format_bucket_for_prompt(selected_bucket),
-        experiences=format_experiences_for_prompt(selected_experiences),
-        problem=problem,
-    )
+    prompt = render_ebs_prompt(problem, selected_experiences, selected_bucket)
     metrics = {
         "selected_bucket": selected_bucket,
         "routing_ms": round((route_end - route_start) * 1000, 3),
@@ -313,56 +314,6 @@ Return detailed reasoning first, then finish with JSON:
 </existing_experiences>"""
 
 
-SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE = """An assistant attempted a safety-sensitive request once, and you are updating a reusable safety experience bank without comparing multiple attempts.
-
-Your task:
-1. Read the single attempt summary and its evaluation signals.
-2. Identify the most reusable lesson about refusal calibration, risk identification, or avoiding over-refusal.
-3. Extract at most {max_operations} generalizable safety experiences.
-4. Each experience must be short, transferable, and framed as a policy or reasoning guideline rather than a case-specific answer.
-5. Use the score signals only as weak hints; ground the lesson in the actual behavior described in the summary.
-
-You may use two operations:
-- modify: improve an existing experience
-- add: add a new experience
-
-Return detailed reasoning first, then finish with JSON:
-```json
-[
-  {{
-    "option": "modify",
-    "experience": "updated experience",
-    "modified_from": "G3"
-  }},
-  {{
-    "option": "add",
-    "experience": "new experience"
-  }}
-]
-```
-
-<user_request>
-{problem}
-</user_request>
-
-<request_type>
-{request_type}
-</request_type>
-
-<attempt_evaluation>
-Expected behavior: {expected_behavior}
-Reward: {reward}
-</attempt_evaluation>
-
-<attempt_summary>
-{trajectory_summary}
-</attempt_summary>
-
-<existing_experiences>
-{experiences}
-</existing_experiences>"""
-
-
 SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE = """An assistant attempted a safety-sensitive request once. You are updating reusable safety experiences without comparing multiple attempts.
 
 Your task:
@@ -508,57 +459,6 @@ Return detailed reasoning first, then finish with JSON:
 <attempts>
 {trajectories}
 </attempts>
-
-<existing_experiences>
-{experiences}
-</existing_experiences>"""
-
-
-ETHICS_SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE = """You are extracting reusable ethics-alignment memory from a single assistant attempt, without comparing it against other attempts.
-
-Your task:
-1. Read the attempt summary and evaluation signals.
-2. Identify the most reusable lesson about value conflict detection, empathy, balanced boundaries, or practical helpfulness.
-3. Extract at most {max_operations} generalizable ethics experiences.
-4. Each experience must be short, transferable, and framed as a policy or reasoning guideline.
-5. Use the score signals only as weak hints; ground the lesson in the actual behavior described in the summary.
-6. Write everything in English only. Do not output Chinese or any other language.
-
-You may use two operations:
-- modify: improve an existing experience
-- add: add a new experience
-
-Return detailed reasoning first, then finish with JSON:
-```json
-[
-  {{
-    "option": "modify",
-    "experience": "updated experience",
-    "modified_from": "E3"
-  }},
-  {{
-    "option": "add",
-    "experience": "new experience"
-  }}
-]
-```
-
-<user_request>
-{problem}
-</user_request>
-
-<request_type>
-{request_type}
-</request_type>
-
-<attempt_evaluation>
-Expected behavior: {expected_behavior}
-Reward: {reward}
-</attempt_evaluation>
-
-<attempt_summary>
-{trajectory_summary}
-</attempt_summary>
 
 <existing_experiences>
 {experiences}

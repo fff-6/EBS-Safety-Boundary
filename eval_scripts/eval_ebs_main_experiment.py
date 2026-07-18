@@ -4,7 +4,7 @@ This entry point intentionally reuses the RedEval RedBench workflow from
 ``eval_ebs_redbench.py`` while fixing the main-experiment surface to:
 
 - HarmBench harmful prompts with direct attack only
-- XSTest benign prompts with the base refusal-evaluation wrapper
+- XSTest prompts through the same generation path used by other direct evaluations
 - HarmBench ASR and XSTest boundary-calibration metrics
 """
 

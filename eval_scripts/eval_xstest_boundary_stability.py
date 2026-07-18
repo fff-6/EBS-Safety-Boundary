@@ -95,7 +95,7 @@ DEFAULT_CONFIG_PATH = _HELPERS.DEFAULT_CONFIG_PATH
 EVALUATE_REFUSAL_TEMPLATE = _HELPERS.EVALUATE_REFUSAL_TEMPLATE
 ModelConfig = _HELPERS.ModelConfig
 _postprocess_refusal_judgments = _HELPERS._postprocess_refusal_judgments
-apply_xstest_experience_prompt = _HELPERS.apply_xstest_experience_prompt
+apply_experience_prompt = _HELPERS.apply_experience_prompt
 build_model_config_from_mapping = _HELPERS.build_model_config_from_mapping
 load_experience_text = _HELPERS.load_experience_text
 load_redeval_default_config = _HELPERS.load_redeval_default_config
@@ -614,12 +614,10 @@ def main() -> None:
             print(f"[boundary-stability] prompt_start {idx}/{len(samples)}", flush=True)
 
         prompt = str(sample["prompt"])
-        harmful_label = int(sample.get("harmful_label", 0))
         final_prompt = (
-            apply_xstest_experience_prompt(
+            apply_experience_prompt(
                 prompt,
                 experience_text=experience_text,
-                harmful_label=harmful_label,
             )
             if method == "EBS"
             else prompt
