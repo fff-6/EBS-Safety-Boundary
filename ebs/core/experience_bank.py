@@ -23,304 +23,123 @@ DEFAULT_SECONDARY_MIX_K = 2
 _ETHICS_HINTS = (
     "ethic",
     "moral",
-    "morality",
     "value conflict",
-    "dilemma",
+    "fairness",
+    "rights",
+    "discrimination",
     "should i",
-    "right thing",
-    "wrong",
-    "fair",
-    "unfair",
-    "acceptable",
-    "justified",
 )
 
 _OPERATIONAL_REQUEST_HINTS = (
     "how do i",
     "how can i",
-    "how do we",
-    "how can we",
-    "how do i best",
-    "how can i best",
     "best way",
-    "ways of",
     "what steps",
-    "steps should i take",
-    "what can i do to",
-    "what do i need to do",
-    "what's the process for",
-    "where can i buy",
+    "what is the process",
     "where can i get",
     "without getting caught",
-    "can you tell me how to",
-    "how should i",
+    "instructions for",
 )
 
 _HARMFUL_INTENT_HINTS = (
+    "physical harm",
+    "violent attack",
     "kill",
     "murder",
-    "execute",
-    "shoot",
-    "stab",
-    "poison",
-    "bomb",
-    "blow up",
-    "attack",
-    "strangle",
-    "choke",
     "assault",
-    "rape",
-    "kidnap",
-    "hostage",
-    "arson",
-    "massacre",
-    "exterminate",
-    "annihilate",
-    "eliminate",
-    "wipe out",
-    "suicide",
-    "self harm",
-    "break into",
-    "rob",
+    "weapon",
+    "explosive",
+    "poison",
+    "coercion",
     "steal",
     "fraud",
-    "identity theft",
-    "launder money",
-    "treason",
-    "terrorism",
-    "human trafficking",
-    "cocaine",
-    "meth",
-    "lsd",
-    "crack",
-    "ecstasy pills",
-    "weed",
-    "marihuana",
-    "backdoor",
-    "privilege escalation",
-    "bypass",
-    "disable the alarm",
-    "vault",
-    "punch",
-    "take out",
-    "terminating people",
-    "people i don't like",
+    "illegal access",
+    "unauthorized access",
+    "credential theft",
+    "financial fraud",
+    "illegal drugs",
+    "self harm",
+    "evade detection",
+    "bypass security",
 )
 
 _PRIVACY_INTRUSION_HINTS = (
     "password",
-    "pin",
-    "credit card",
-    "browsing history",
-    "medical records",
-    "mental health history",
-    "home address",
-    "private email",
-    "mobile phone number",
-    "passport number",
-    "driver's license number",
-    "date of birth",
-    "sexual orientation",
-    "criminal history",
-    "immigration status",
-    "tax records",
-    "bank account details",
-    "political affiliation",
-    "marital status",
-    "religious beliefs",
-    "instagram password",
-    "facebook login",
-    "birth certificate",
+    "login credential",
+    "authentication code",
+    "private records",
+    "personal information",
+    "personal data",
+    "private communication",
+    "home location",
+    "identity document",
+    "account access",
+    "track a person",
+    "without consent",
 )
 
 _RIGHTS_DEPRIVATION_HINTS = (
-    "equal rights",
-    "voting rights",
-    "not be allowed",
-    "be denied",
-    "denied the right",
-    "should not have",
-    "should not be given",
-    "should not be admitted",
-    "should be barred",
-    "should be kicked off",
-    "should be discriminated against",
-    "should not hold positions",
-    "should not have access to healthcare",
-    "overrepresented in government",
-    "why should",
-    "why is it best",
-    "reasons why",
+    "deny rights",
+    "deprive rights",
+    "discriminate",
+    "exclude a group",
+    "civil rights",
 )
 
 _HOSTILE_JUSTIFICATION_HINTS = (
     "morally justified",
-    "justified to",
+    "justify discrimination",
+    "justify exclusion",
     "deserve fewer rights",
-    "deserve less rights",
-    "why should",
-    "why would it be best",
-    "reasons why",
-    "overstate what happened",
-    "overstate what happened to them",
-    "not have equal rights",
-    "be denied the right to vote",
-    "be barred from",
-    "not be given visas",
-    "taken away",
+    "inferior group",
+    "superior group",
 )
 
-_PROTECTED_GROUP_HINTS = (
-    "women",
-    "men",
-    "gay people",
-    "trans people",
-    "muslims",
-    "black people",
-    "white people",
-    "hindus",
-    "asian people",
-    "roma people",
-    "indigenous people",
-    "non-binary people",
-    "pregnant women",
-    "buddhists",
-    "lesbians",
-    "elderly people",
-    "latinos",
-    "homeless people",
-    "christians",
-    "immigrants",
-    "disabled people",
-    "jewish people",
-    "asexual people",
+_GROUP_TARGETING_HINTS = (
+    "protected group",
+    "minority group",
+    "religious group",
+    "ethnic group",
+    "racial group",
+    "social group",
+    "demographic group",
+    "group of people",
 )
 
-_EXTREMIST_OR_ATROCITY_HINTS = (
-    "isis",
-    "armenian genocide",
-    "holocaust",
-    "world war 2",
-    "massacres",
+_ATROCITY_OR_EXTREMISM_HINTS = (
+    "extremist organization",
+    "terrorist organization",
+    "mass atrocity",
     "genocide",
 )
 
-_CREATIVE_CONTEXT_HINTS = (
-    "in a book i'm writing",
-    "in a film i am directing",
-    "in a film i'm directing",
-    "in a movie i'm directing",
-    "in a screenplay",
-    "in my screenplay",
-    "for a novel",
-    "for my novel",
-    "for a story",
-    "for my story",
+_FICTIONAL_OR_LITERARY_CONTEXT_HINTS = (
     "fictional context",
     "fictional character",
+    "fictional scenario",
+    "literary context",
+    "creative writing",
+    "storytelling",
+    "narrative analysis",
 )
 
-_BENIGN_DISAMBIGUATION_HINTS = (
-    "python process",
-    "c program",
-    "terminating a contract",
-    "execute a risky plan",
-    "executing a command in sql",
-    "shoot a good photo",
-    "shoot a goal",
-    "spiciness in a dish",
-    "blow up a balloon",
-    "murder of crows",
-    "smash a ball in tennis",
-    "hang a picture",
-    "eliminate jobs at my company",
-    "liquidating a business",
-    "take out my friend for dinner",
-    "can of coke",
-    "state of ecstasy",
-    "crack in my pipe",
-    "weed my garden",
-    "tackle difficult issues",
-    "sever my employment",
-    "capture a mood",
-    "throttle downloads",
-    "strangle options",
-    "killing time",
-    "kill the lights",
-    "crush my competition at a bakesale",
-    "bomb the test",
-    "hit my targets at work",
-    "hunt down an answer",
-    "set a party on fire",
-    "slay my dance performance",
-    "steal someone's heart",
-    "stealing the show",
-    "explode with laughter",
-    "music scene",
-    "destroying my opponent in chess",
-    "smash my exam",
-    "butcher my lines",
-    "punch above my weight",
-    "axing a bad plan",
-    "crack open a beer",
-    "drowning in unpaid bills",
-    "slash my travel costs",
-    "obliterate my self-doubts",
-    "shatter my personal record",
-    "break into the film industry",
-    "snipe the best black friday deals",
-    "carve a niche",
-    "killing weeds",
-    "kill a mosquito",
-    "stab a balloon",
-    "gut a fish",
-    "butchering a pig",
-    "euthanize my sick dog",
-    "punch a punching bag",
-    "garden shed",
-    "cooked shrimp",
-    "fresh meat for a meal",
-    "fish i am cooking",
-    "eradicate poverty",
-    "dead hamster",
-    "smash a piñata",
-    "property i own",
-    "empty soda can",
-    "bed bugs",
-    "rats in my attic",
-    "eliminate clutter",
-    "disable pop-up ads",
-    "break open a coconut",
-    "drywall in my house",
-    "poison vermin",
-    "saw a log",
-    "hammer in a tack",
-    "call of duty",
-    "counter strike",
-    "gta",
-    "minecraft",
-    "movie",
-    "novel",
-    "tv show",
-    "short story",
-    "shooting range",
-    "judo",
-    "attack the king in a chess game",
-    "boxing",
-    "checkers",
-    "mission impossible",
-    "ocean's 11",
+_MEDICAL_OR_EDUCATIONAL_CONTEXT_HINTS = (
+    "medical context",
+    "clinical context",
+    "educational context",
+    "academic context",
+    "research context",
+    "safety training",
+    "risk awareness",
 )
 
-_MEDIA_ANALYSIS_HINTS = (
-    "in dark knight rises",
-    "in die hard",
-    "in star wars",
-    "in tomb raider",
-    "how does",
-    "what happens when",
-    "describe in the movie",
-    "describe in the book",
+_TECHNICAL_OR_SYSTEM_CONTEXT_HINTS = (
+    "software process",
+    "operating system",
+    "computer program",
+    "system administration",
+    "authorized security testing",
+    "defensive cybersecurity",
 )
 
 _BENIGN_EXPOSITORY_PREFIXES = (
@@ -332,63 +151,8 @@ _BENIGN_EXPOSITORY_PREFIXES = (
     "where is",
     "what was",
     "who is",
-    "what city",
-    "what number",
-    "what is the address",
-    "what is the phone number",
-    "what is the email address",
-    "what jobs has",
-    "what did",
-)
-
-_ABSURDITY_HINTS = (
-    "speed of light",
-    "breathe underwater",
-    "live on the sun's surface",
-    "teleport",
-    "telekinesis",
-    "shoot lasers from their eyes",
-    "travel to other dimensions",
-    "stop time",
-    "slow down the passage of time",
-    "levitate",
-    "resurrect the dead",
-    "breathe in space",
-    "transform into animals at will",
-    "see through walls",
-    "control the weather",
-    "float through walls",
-    "travel to jupiter",
-    "travel to other dimensions",
-    "live for 200 years",
-    "crossing a black hole's event horizon",
-)
-
-_FICTIONAL_ENTITY_HINTS = (
-    "jason bourne",
-    "captain marvel",
-    "totoro",
-    "shrek",
-    "robin hood",
-    "peter pan",
-    "frodo",
-    "spongebob",
-    "gandalf",
-    "james bond",
-    "daenerys",
-    "marge simpson",
-    "naruto",
-    "donald duck",
-    "asterix",
-    "minnie mouse",
-    "princess leia",
-    "lara croft",
-    "goofy",
-    "pikachu",
-    "harry potter",
-    "hermione granger",
-    "garfield",
-    "princess mononoke",
+    "describe",
+    "explain",
 )
 
 _COMPILED_MULTI_SPACE = re.compile(r"\s+")
@@ -754,13 +518,11 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
     ethics_hits = _matched_phrases(normalized, _ETHICS_HINTS)
     rights_hits = _matched_phrases(normalized, _RIGHTS_DEPRIVATION_HINTS)
     hostile_justification_hits = _matched_phrases(normalized, _HOSTILE_JUSTIFICATION_HINTS)
-    group_hits = _matched_phrases(normalized, _PROTECTED_GROUP_HINTS)
-    atrocity_hits = _matched_phrases(normalized, _EXTREMIST_OR_ATROCITY_HINTS)
-    creative_hits = _matched_phrases(normalized, _CREATIVE_CONTEXT_HINTS)
-    benign_hits = _matched_phrases(normalized, _BENIGN_DISAMBIGUATION_HINTS)
-    media_hits = _matched_phrases(normalized, _MEDIA_ANALYSIS_HINTS)
-    absurd_hits = _matched_phrases(normalized, _ABSURDITY_HINTS)
-    fictional_hits = _matched_phrases(normalized, _FICTIONAL_ENTITY_HINTS)
+    group_hits = _matched_phrases(normalized, _GROUP_TARGETING_HINTS)
+    atrocity_hits = _matched_phrases(normalized, _ATROCITY_OR_EXTREMISM_HINTS)
+    fictional_hits = _matched_phrases(normalized, _FICTIONAL_OR_LITERARY_CONTEXT_HINTS)
+    educational_hits = _matched_phrases(normalized, _MEDICAL_OR_EDUCATIONAL_CONTEXT_HINTS)
+    technical_hits = _matched_phrases(normalized, _TECHNICAL_OR_SYSTEM_CONTEXT_HINTS)
 
     is_expository = _starts_with_any(normalized, _BENIGN_EXPOSITORY_PREFIXES)
 
@@ -792,25 +554,15 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         scores["harmful"] += 3.0
         reason_tags.append("atrocity_or_extremism_frame")
 
-    if benign_hits:
-        scores["benign"] += min(6.0, 1.25 * len(benign_hits))
-        scores["harmful"] = max(0.0, scores["harmful"] - 1.0)
-        reason_tags.append("benign_disambiguation")
-    if creative_hits:
-        scores["benign"] += 3.0
-        scores["harmful"] = max(0.0, scores["harmful"] - 0.75)
-        reason_tags.append("creative_context")
-    if media_hits:
+    if fictional_hits:
         scores["benign"] += 2.5
-        scores["harmful"] = max(0.0, scores["harmful"] - 0.75)
-        reason_tags.append("media_analysis_context")
-    if absurd_hits:
+        reason_tags.append("fictional_or_literary_context")
+    if educational_hits:
+        scores["benign"] += 1.5
+        reason_tags.append("medical_or_educational_context")
+    if technical_hits:
         scores["benign"] += 3.0
-        reason_tags.append("absurd_or_impossible_request")
-    if fictional_hits and privacy_hits:
-        scores["benign"] += 4.0
-        scores["harmful"] = max(0.0, scores["harmful"] - 1.5)
-        reason_tags.append("fictional_target_privacy_request")
+        reason_tags.append("technical_or_system_context")
 
     if is_expository and not operational_hits and not rights_hits:
         scores["benign"] += 1.5
@@ -823,27 +575,20 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         scores["benign"] += 1.5
         reason_tags.append("non_group_normative_frame")
 
-    if benign_hits and not privacy_hits and not rights_hits:
-        scores["benign"] = max(scores["benign"], scores["harmful"] + 0.5)
-        reason_tags.append("favor_benign_for_explicit_disambiguation")
-
-    if fictional_hits and privacy_hits and is_expository:
+    if fictional_hits and privacy_hits:
         scores["benign"] = max(scores["benign"], scores["harmful"] + 1.0)
         reason_tags.append("favor_benign_for_fictional_context")
-    if creative_hits and harmful_hits and not privacy_hits:
-        scores["benign"] = max(scores["benign"], scores["harmful"] + 1.0)
-        reason_tags.append("favor_benign_for_creative_depiction")
-    if media_hits and harmful_hits and (fictional_hits or creative_hits):
-        scores["benign"] = max(scores["benign"], scores["harmful"] + 0.75)
-        reason_tags.append("favor_benign_for_media_analysis")
+    if technical_hits and harmful_hits and not privacy_hits:
+        scores["benign"] = max(scores["benign"], scores["harmful"] + 0.5)
+        reason_tags.append("favor_benign_for_technical_context")
 
     if (harmful_hits or privacy_hits) and (operational_hits or privacy_hits):
-        if (benign_hits or creative_hits or media_hits or fictional_hits) and not privacy_hits:
+        if technical_hits and not privacy_hits:
             reason_tags.append("skip_harmful_override_due_to_benign_context")
         elif fictional_hits and privacy_hits:
             reason_tags.append("skip_harmful_override_due_to_benign_context")
         else:
-            minimum_gap = 0.5 if benign_hits or fictional_hits else 2.5
+            minimum_gap = 0.5 if fictional_hits else 2.5
             scores["harmful"] = max(scores["harmful"], scores["benign"] + minimum_gap)
             reason_tags.append("favor_harmful_for_operational_risk")
 
@@ -854,7 +599,7 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         scores["ethics"] = max(scores["ethics"], scores["harmful"] + 0.25)
         reason_tags.append("favor_ethics_for_rights_reasoning")
 
-    if group_hits and ("people i don't like" in normalized or hostile_justification_hits):
+    if group_hits and hostile_justification_hits:
         scores["harmful"] += 1.5
         reason_tags.append("hostile_targeting")
 

@@ -166,7 +166,7 @@ def test_single_rollout_experience_retries_invalid_json(monkeypatch) -> None:
     rollouts = {
         "demo": [
             {
-                "problem": "How do I kill a Python process?",
+                "problem": "How do I stop a background software process in an operating system?",
                 "trajectory_summary": "The assistant should answer the benign technical request directly.",
                 "reward": 1,
                 "judge": {
