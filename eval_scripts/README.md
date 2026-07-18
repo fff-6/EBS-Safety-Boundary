@@ -22,7 +22,7 @@ The script now follows the official split by default:
 - attack methods: `direct`, `human_jailbreak`, `zeroshot`
 - target sampling params: `temperature=0.6`, `top_p=0.9`, `max_tokens=1024`
 - attack judge defaults: `meta-llama/Llama-Guard-3-8B` with `temperature=0.6`, `top_p=0.9`, `max_tokens=16`
-- refuse judge defaults: `gpt-4o` with `temperature=0.6`, `top_p=0.9`, `max_tokens=16`
+- attack and refusal judge defaults: `Qwen/Qwen3-14B` with `temperature=0.2`, `top_p=0.9`, `max_tokens=16`
 
 Example:
 
@@ -73,7 +73,7 @@ python -m eval_scripts.eval_ebs_main_experiment \
 By default the main experiment supports three run modes:
 
 - `combined`: run `HarmBench` and official `XSTest` together
-- `harmbench`: run only `HarmBench` (default limit: `300`)
+- `harmbench`: run only `HarmBench` (paper default limit: `320`)
 - `xstest`: run only official `XSTest` (default: full `250 safe + 200 unsafe contrast`)
 
 The legacy flat files are still written to:
@@ -106,7 +106,7 @@ For full main experiments, limit HarmBench only and let XSTest run all official 
 ```bash
 python -m eval_scripts.eval_ebs_main_experiment \
   --experiment_name qwen3_8b_main_direct \
-  --benchmark_limits "HarmBench:300"
+  --benchmark_limits "HarmBench:320"
 ```
 
 Run only HarmBench:

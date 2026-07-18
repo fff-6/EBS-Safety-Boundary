@@ -1,12 +1,13 @@
 import time
+from typing import Any
 
 from ebs.core.experience_bank import (
     CATEGORY_KEYS,
     format_experiences_for_prompt,
     route_experience_buckets,
     select_experiences,
+    select_experiences_detailed,
 )
-
 
 PROBLEM_WITH_EXPERIENCE_TEMPLATE = """You are a safety-enhanced assistant that uses dynamic safety experiences distilled from prior rollouts.
 
@@ -68,18 +69,10 @@ CALIBRATION RULES
 - For benign requests: do not refuse just because a past experience sounds safety-related.
 - For ethics or value-conflict requests: acknowledge the tension briefly, then give balanced, practical help.
 
-You must respond using exactly this structure:
-<safety_reasoning>
-intent: one short sentence
-relevant_rules: "None"
-conflict_type: one label or "None"
-risk_level: low / medium / high
-response_strategy: refuse / safe_alternative / partial_answer / clarify / normal_answer
-rationale: 2-5 short sentences explaining the safety decision
-</safety_reasoning>
-<answer>
-A concise, user-facing response that follows the selected strategy.
-</answer>"""
+OUTPUT RULES
+- Return only the final user-facing answer.
+- Do not reveal hidden reasoning, routing decisions, risk labels, policy summaries, or XML tags.
+- Keep the answer concise and natural."""
 
 
 def format_bucket_for_prompt(bucket: str | None) -> str:
@@ -117,24 +110,33 @@ def build_ebs_prompt_with_metrics(
     bucket: str | None = None,
     *,
     disable_experience_retrieval: bool = False,
-) -> tuple[str, dict[str, float | str | None]]:
+) -> tuple[str, dict[str, Any]]:
     """Build EBS prompt and return routing/retrieval timing metrics."""
 
     route_start = time.perf_counter()
-    if bucket in CATEGORY_KEYS:
-        selected_bucket = str(bucket)
-        route_confidence = None
-    else:
-        decision = route_experience_buckets(problem)
-        selected_bucket = decision.primary_bucket
-        route_confidence = decision.confidence
+    decision = route_experience_buckets(problem)
+    selected_bucket = str(bucket) if bucket in CATEGORY_KEYS else decision.primary_bucket
+    route_confidence = None if bucket in CATEGORY_KEYS else decision.confidence
     route_end = time.perf_counter()
 
     retrieval_start = route_end
     if disable_experience_retrieval:
         selected_experiences: dict[str, str] = {}
+        source_buckets: dict[str, str] = {}
+        similarity_scores: dict[str, float] = {}
+        mixed_retrieval = False
     else:
-        _, selected_experiences = select_experiences(experiences or {}, problem=problem, bucket=selected_bucket)
+        selection = select_experiences_detailed(
+            experiences or {},
+            problem=problem,
+            bucket=bucket,
+            routing_decision=decision,
+        )
+        selected_bucket = selection.selected_bucket
+        selected_experiences = selection.experiences
+        source_buckets = selection.source_buckets
+        similarity_scores = selection.similarity_scores
+        mixed_retrieval = selection.mixed_retrieval
     retrieval_end = time.perf_counter()
 
     prompt = PROBLEM_WITH_EXPERIENCE_TEMPLATE.format(
@@ -148,6 +150,10 @@ def build_ebs_prompt_with_metrics(
         "retrieval_ms": round((retrieval_end - retrieval_start) * 1000, 3),
         "route_confidence": route_confidence,
         "num_selected_experiences": len(selected_experiences),
+        "mixed_retrieval": mixed_retrieval,
+        "retrieved_experience_ids": list(selected_experiences),
+        "retrieved_source_buckets": source_buckets,
+        "retrieved_similarity_scores": similarity_scores,
     }
     return prompt, metrics
 
@@ -255,8 +261,6 @@ Requirements:
 <evaluation>
 Expected behavior: {expected_behavior}
 Reward: {reward}
-General reward: {general_reward}
-Risk-aware reward: {risk_reward}
 </evaluation>
 
 Only return a numbered step-by-step summary."""
@@ -348,8 +352,6 @@ Return detailed reasoning first, then finish with JSON:
 <attempt_evaluation>
 Expected behavior: {expected_behavior}
 Reward: {reward}
-General reward: {general_reward}
-Risk-aware reward: {risk_reward}
 </attempt_evaluation>
 
 <attempt_summary>
@@ -399,8 +401,6 @@ Return brief reasoning first, then finish with JSON:
 
 <attempt>
 Reward: {reward}
-General reward: {general_reward}
-Risk-aware reward: {risk_reward}
 {trajectory_summary}
 </attempt>
 
@@ -463,8 +463,6 @@ Requirements:
 <evaluation>
 Expected behavior: {expected_behavior}
 Reward: {reward}
-General reward: {general_reward}
-Risk-aware reward: {risk_reward}
 </evaluation>
 
 Only return a numbered step-by-step summary."""
@@ -556,8 +554,6 @@ Return detailed reasoning first, then finish with JSON:
 <attempt_evaluation>
 Expected behavior: {expected_behavior}
 Reward: {reward}
-General reward: {general_reward}
-Risk-aware reward: {risk_reward}
 </attempt_evaluation>
 
 <attempt_summary>
@@ -608,8 +604,6 @@ Return brief reasoning first, then finish with JSON:
 
 <attempt>
 Reward: {reward}
-General reward: {general_reward}
-Risk-aware reward: {risk_reward}
 {trajectory_summary}
 </attempt>
 

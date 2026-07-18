@@ -12,12 +12,11 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from ebs.main import load_rollouts, rollout_dataset
-from ebs.main import _load_project_env, resolve_target_model_overrides
 from ebs.core.experience_bank import (
     has_any_experiences,
     normalize_experience_bank,
 )
+from ebs.main import _load_project_env, load_rollouts, resolve_target_model_overrides, rollout_dataset
 from ebs.runtime.agents import SimpleAgent
 from ebs.runtime.config import ConfigLoader
 
@@ -131,11 +130,13 @@ async def main(args):
             else:
                 experiences = normalize_experience_bank({})
 
-            # Format the batch data with experiences
+            # The default full mode keeps the base-model rollouts independent of experiences
+            # accumulated from earlier batches. Iterative construction is retained
+            # only as an explicitly requested experimental variant.
             formatted_batch_data = [
                 {
                     "prompt": build_ebs_prompt(each["problem"], experiences=experiences)
-                    if has_any_experiences(experiences)
+                    if args.iterative_experience_construction and has_any_experiences(experiences)
                     else each["problem"],
                     **each,
                 }
@@ -176,7 +177,9 @@ async def main(args):
                     only_partial_correct=True if args.grpo_n > 1 else False,
                     experience_update_method=args.experience_update_method,
                 )
-                json.dump(new_experiences, open(next_experience_filename, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+                json.dump(
+                    new_experiences, open(next_experience_filename, "w", encoding="utf-8"), indent=2, ensure_ascii=False
+                )
                 print(f"Saved {len(new_experiences)} experiences to {next_experience_filename}")
 
             # Save stats
@@ -189,9 +192,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode", type=str, default="agent", required=True, choices=["prompt", "agent"], help="Mode of inference"
     )
-    parser.add_argument(
-        "--domain", type=str, required=True, choices=["ebs"], help="domain of the tasks (ebs)"
-    )
+    parser.add_argument("--domain", type=str, required=True, choices=["ebs"], help="domain of the tasks (ebs)")
     parser.add_argument("--experiment_name", type=str, required=True, help="name of experiment run")
     parser.add_argument("--dataset", type=str, required="True", help="Name of dataset")
     parser.add_argument("--dataset_truncate", type=int, default=None, help="Truncate dataset to first N samples")
@@ -208,7 +209,18 @@ if __name__ == "__main__":
         type=str,
         default="critique",
         choices=["critique", "summary"],
-        help="Experience update strategy: compare multiple attempts (`critique`) or extract from single-rollout summaries (`summary`).",
+        help=(
+            "Experience update strategy: compare multiple attempts (`critique`) or extract from "
+            "single-rollout summaries (`summary`)."
+        ),
+    )
+    parser.add_argument(
+        "--iterative_experience_construction",
+        action="store_true",
+        help=(
+            "Experimental iterative mode: inject experiences accumulated from earlier batches into later rollouts. "
+            "The default full workflow keeps this disabled."
+        ),
     )
     parser.add_argument(
         "--client_timeout",

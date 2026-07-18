@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm import tqdm
 
-from ebs.llm import LLM
 from ebs.core.experience_bank import (
     CATEGORY_KEYS,
     format_experiences_for_prompt,
@@ -24,6 +23,7 @@ from ebs.core.prompts import (
     SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE,
     SINGLE_ROLLOUT_SUMMARY_TEMPLATE,
 )
+from ebs.llm import LLM
 
 
 class ExperienceUpdater:
@@ -62,7 +62,9 @@ class ExperienceUpdater:
     def _normalize_bucket_language(self, experiences: dict[str, str], bucket: str) -> dict[str, str]:
         normalized_bucket: dict[str, str] = {}
         for exp_id, text in experiences.items():
-            normalized_bucket[exp_id] = self._rewrite_experience_in_english(text, bucket) if isinstance(text, str) else text
+            normalized_bucket[exp_id] = (
+                self._rewrite_experience_in_english(text, bucket) if isinstance(text, str) else text
+            )
         return normalized_bucket
 
     def _parse_json_payload(self, response: str):
@@ -92,7 +94,7 @@ class ExperienceUpdater:
         save_dir,
         max_workers=16,
         given_ground_truth=True,
-        only_partial_correct=True,
+        only_partial_correct=False,
         experience_update_method="critique",
     ):
         del given_ground_truth
@@ -120,8 +122,7 @@ class ExperienceUpdater:
             )
         else:
             raise ValueError(
-                f"Unsupported experience_update_method: {experience_update_method}. "
-                "Expected one of: critique, summary."
+                f"Unsupported experience_update_method: {experience_update_method}. Expected one of: critique, summary."
             )
         new_experiences = self._batch_update(
             experiences=experiences,
@@ -161,7 +162,9 @@ class ExperienceUpdater:
             try:
                 judge = cur.get("judge", {})
                 bucket = cur.get("groundtruth", {}).get("experience_bucket", "harmful")
-                template = ETHICS_SINGLE_ROLLOUT_SUMMARY_TEMPLATE if bucket == "ethics" else SINGLE_ROLLOUT_SUMMARY_TEMPLATE
+                template = (
+                    ETHICS_SINGLE_ROLLOUT_SUMMARY_TEMPLATE if bucket == "ethics" else SINGLE_ROLLOUT_SUMMARY_TEMPLATE
+                )
                 response = self.llm.chat(
                     template.format(
                         problem=cur["problem"],
@@ -222,21 +225,25 @@ class ExperienceUpdater:
             try:
                 problem = rollouts_per_problem[0]["problem"]
                 bucket = rollouts_per_problem[0].get("groundtruth", {}).get("experience_bucket", "harmful")
-                request_type = bucket if bucket == "ethics" else ("harmful" if rollouts_per_problem[0]["judge"]["harmful_label"] else "benign")
+                request_type = (
+                    bucket
+                    if bucket == "ethics"
+                    else ("harmful" if rollouts_per_problem[0]["judge"]["harmful_label"] else "benign")
+                )
                 formatted_attempts = "\n\n".join(
                     [
-                        "Attempt {idx} (reward={reward:.2f}, general={general:.2f}, risk={risk:.2f}):\n{summary}".format(
+                        "Attempt {idx} (composite_reward={reward:.2f}):\n{summary}".format(
                             idx=i + 1,
                             reward=each.get("reward", 0),
-                            general=each.get("judge", {}).get("general_reward", 0),
-                            risk=each.get("judge", {}).get("risk_reward", 0),
                             summary=each["trajectory_summary"],
                         )
                         for i, each in enumerate(rollouts_per_problem)
                     ]
                 )
                 formatted_experiences = format_experiences_for_prompt(experiences.get(bucket, {}))
-                template = ETHICS_SINGLE_QUERY_CRITIQUE_TEMPLATE if bucket == "ethics" else SINGLE_QUERY_CRITIQUE_TEMPLATE
+                template = (
+                    ETHICS_SINGLE_QUERY_CRITIQUE_TEMPLATE if bucket == "ethics" else SINGLE_QUERY_CRITIQUE_TEMPLATE
+                )
                 response = self.llm.chat(
                     template.format(
                         max_operations=max_operations,
@@ -291,9 +298,7 @@ class ExperienceUpdater:
                     return results
 
         all_rollouts = [
-            rollout
-            for grouped_rollouts in problem_to_summarized_rollouts.values()
-            for rollout in grouped_rollouts
+            rollout for grouped_rollouts in problem_to_summarized_rollouts.values() for rollout in grouped_rollouts
         ]
 
         def process(rollout):
@@ -392,7 +397,9 @@ class ExperienceUpdater:
                 except Exception:
                     print(f"Warning: failed to decode operation: {operation}")
 
-            template = ETHICS_BATCH_EXPERIENCE_UPDATE_TEMPLATE if bucket == "ethics" else BATCH_EXPERIENCE_UPDATE_TEMPLATE
+            template = (
+                ETHICS_BATCH_EXPERIENCE_UPDATE_TEMPLATE if bucket == "ethics" else BATCH_EXPERIENCE_UPDATE_TEMPLATE
+            )
             response = "[]"
             revision_plan = []
             if candidate_experiences or to_modify:

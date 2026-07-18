@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+import hashlib
 import json
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -15,8 +16,9 @@ from ebs.runtime.utils.token import TokenUtils
 CATEGORY_KEYS = ("harmful", "benign", "ethics")
 _CATEGORY_PREFIX = {"harmful": "H", "benign": "B", "ethics": "E"}
 
-_MIX_CONFIDENCE_THRESHOLD = 0.35
-_SECONDARY_MIX_MAX_ITEMS = 4
+DEFAULT_MIX_CONFIDENCE_THRESHOLD = 0.35
+DEFAULT_PRIMARY_MIX_K = 6
+DEFAULT_SECONDARY_MIX_K = 2
 
 _ETHICS_HINTS = (
     "ethic",
@@ -392,7 +394,7 @@ _FICTIONAL_ENTITY_HINTS = (
 _COMPILED_MULTI_SPACE = re.compile(r"\s+")
 DEFAULT_EXPERIENCE_TOP_K = 8
 DEFAULT_EXPERIENCE_TOKEN_BUDGET = 0
-_RETRIEVER_CACHE: dict[tuple[str, str, str | None, int, bool], "ExperienceRetriever"] = {}
+_RETRIEVER_CACHE: dict[tuple[str, str, str | None, int, bool], ExperienceRetriever] = {}
 
 
 @dataclass(slots=True, frozen=True)
@@ -414,6 +416,18 @@ class ExperienceMatch:
     text: str
     score: float
     bucket: str
+
+
+@dataclass(frozen=True)
+class ExperienceSelection:
+    """Auditable result of routed experience retrieval."""
+
+    routing: RoutingDecision
+    selected_bucket: str
+    experiences: dict[str, str]
+    source_buckets: dict[str, str]
+    similarity_scores: dict[str, float]
+    mixed_retrieval: bool
 
 
 def _safe_norm(vectors: np.ndarray) -> np.ndarray:
@@ -473,7 +487,8 @@ class ExperienceTextEmbedder:
             if not tokens:
                 continue
             for token in tokens:
-                token_hash = hash(token)
+                digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+                token_hash = int.from_bytes(digest, "little", signed=False)
                 col = token_hash % self.dimension
                 sign = 1.0 if (token_hash >> 1) % 2 == 0 else -1.0
                 vectors[row_idx, col] += sign
@@ -586,6 +601,42 @@ class ExperienceRetriever:
             )
         return selected
 
+    def select_bucket_with_scores(
+        self,
+        query: str,
+        *,
+        bucket: str,
+        max_items: int,
+        token_budget: int,
+        tokens_used: int = 0,
+    ) -> tuple[dict[str, str], dict[str, float], int]:
+        """Retrieve a fixed quota from one bucket, preserving ranked scores."""
+
+        if not query.strip() or max_items <= 0:
+            return {}, {}, tokens_used
+        query_vec = self._embedder.encode([query])[0]
+        min_score = 0.2 if self.resolved_backend == "hash" else 0.1
+        ranked = self._rank_bucket(query_vec, bucket=bucket, min_score=min_score, score_boost=0.0)
+        ranked_ids = {match.experience_id for match in ranked}
+        for exp_id, text in self._items_by_bucket.get(bucket, []):
+            if exp_id not in ranked_ids:
+                ranked.append(ExperienceMatch(exp_id, text, 0.0, bucket))
+
+        selected: dict[str, str] = {}
+        scores: dict[str, float] = {}
+        for match in ranked:
+            if len(selected) >= max_items:
+                break
+            item_tokens = _count_experience_tokens(match.experience_id, match.text)
+            if _has_token_budget(token_budget) and tokens_used > 0 and tokens_used + item_tokens > token_budget:
+                continue
+            if _has_token_budget(token_budget) and not selected and tokens_used == 0 and item_tokens > token_budget:
+                continue
+            selected[match.experience_id] = match.text
+            scores[match.experience_id] = match.score
+            tokens_used += item_tokens
+        return selected, scores, tokens_used
+
     def _fill_from_bucket(
         self,
         *,
@@ -690,11 +741,11 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
             primary_bucket="harmful",
             secondary_bucket="ethics",
             confidence=0.0,
-            scores={category: 0.0 for category in CATEGORY_KEYS},
+            scores=dict.fromkeys(CATEGORY_KEYS, 0.0),
             reason_tags=("empty_query_fallback",),
         )
 
-    scores = {category: 0.0 for category in CATEGORY_KEYS}
+    scores = dict.fromkeys(CATEGORY_KEYS, 0.0)
     reason_tags: list[str] = []
 
     operational_hits = _matched_phrases(normalized, _OPERATIONAL_REQUEST_HINTS)
@@ -909,27 +960,63 @@ def select_experiences(
     secondary bucket are considered during retrieval to reduce hard routing mistakes.
     """
 
+    selection = select_experiences_detailed(
+        experiences,
+        problem=problem,
+        harmful_label=harmful_label,
+        bucket=bucket,
+        max_experiences=max_experiences,
+        token_budget=token_budget,
+        embedding_backend=embedding_backend,
+        embedding_model=embedding_model,
+        embedding_dim=embedding_dim,
+        allow_fallback_hash=allow_fallback_hash,
+    )
+    return selection.selected_bucket, selection.experiences
+
+
+def select_experiences_detailed(
+    experiences: Any,
+    *,
+    problem: str,
+    harmful_label: int | None = None,
+    bucket: str | None = None,
+    routing_decision: RoutingDecision | None = None,
+    max_experiences: int = DEFAULT_EXPERIENCE_TOP_K,
+    token_budget: int = DEFAULT_EXPERIENCE_TOKEN_BUDGET,
+    mix_confidence_threshold: float = DEFAULT_MIX_CONFIDENCE_THRESHOLD,
+    primary_mix_k: int = DEFAULT_PRIMARY_MIX_K,
+    secondary_mix_k: int = DEFAULT_SECONDARY_MIX_K,
+    embedding_backend: str = "hash",
+    embedding_model: str | None = None,
+    embedding_dim: int = 256,
+    allow_fallback_hash: bool = True,
+) -> ExperienceSelection:
+    """Route once and retrieve with the fixed mixed-retrieval quotas."""
+
     del harmful_label
     normalized = normalize_experience_bank(experiences)
+    decision = routing_decision or route_experience_buckets(problem)
+    selected_bucket = str(bucket) if bucket in CATEGORY_KEYS else decision.primary_bucket
     if max_experiences <= 0:
-        return bucket or "harmful", {}
+        return ExperienceSelection(decision, selected_bucket, {}, {}, {}, False)
 
-    if bucket in CATEGORY_KEYS:
-        selected_bucket = str(bucket)
-    else:
-        decision = route_experience_buckets(problem)
-        selected_bucket = decision.primary_bucket
-    selected_bucket = str(bucket) if bucket in CATEGORY_KEYS else selected_bucket
-    secondary_bucket = None
-    if bucket not in CATEGORY_KEYS:
-        decision = route_experience_buckets(problem)
-        selected_bucket = decision.primary_bucket
-        if (
-            decision.secondary_bucket is not None
-            and decision.confidence < _MIX_CONFIDENCE_THRESHOLD
-            and normalized.get(decision.secondary_bucket)
-        ):
-            secondary_bucket = decision.secondary_bucket
+    mixed = (
+        bucket not in CATEGORY_KEYS
+        and decision.secondary_bucket is not None
+        and decision.confidence < mix_confidence_threshold
+        and bool(normalized.get(decision.secondary_bucket))
+    )
+    if mixed and primary_mix_k + secondary_mix_k != max_experiences:
+        if max_experiences == DEFAULT_EXPERIENCE_TOP_K:
+            raise ValueError("Mixed retrieval requires primary_mix_k + secondary_mix_k == K.")
+        secondary_mix_k = min(secondary_mix_k, max(0, (max_experiences - 1) // 2))
+        primary_mix_k = max_experiences - secondary_mix_k
+        if secondary_mix_k == 0:
+            mixed = False
+    if mixed and primary_mix_k <= secondary_mix_k:
+        raise ValueError("Mixed retrieval requires primary_mix_k > secondary_mix_k.")
+
     retriever = _get_cached_retriever(
         normalized,
         embedding_backend=embedding_backend,
@@ -937,27 +1024,40 @@ def select_experiences(
         embedding_dim=embedding_dim,
         allow_fallback_hash=allow_fallback_hash,
     )
-    selected = retriever.select(
-        problem,
-        bucket=selected_bucket,
-        max_items=max_experiences,
-        token_budget=token_budget,
-        secondary_bucket=secondary_bucket,
+    primary_quota = primary_mix_k if mixed else max_experiences
+    selected, scores, tokens_used = retriever.select_bucket_with_scores(
+        problem, bucket=selected_bucket, max_items=primary_quota, token_budget=token_budget
     )
+    sources = dict.fromkeys(selected, selected_bucket)
+    if mixed and decision.secondary_bucket is not None:
+        secondary, secondary_scores, _ = retriever.select_bucket_with_scores(
+            problem,
+            bucket=decision.secondary_bucket,
+            max_items=secondary_mix_k,
+            token_budget=token_budget,
+            tokens_used=tokens_used,
+        )
+        selected.update(secondary)
+        scores.update(secondary_scores)
+        sources.update(dict.fromkeys(secondary, decision.secondary_bucket))
     if selected:
-        return selected_bucket, selected
+        return ExperienceSelection(decision, selected_bucket, selected, sources, scores, mixed)
 
     for fallback_bucket in CATEGORY_KEYS:
         if normalized[fallback_bucket]:
-            selected = retriever.select(
-                problem,
-                bucket=fallback_bucket,
-                max_items=max_experiences,
-                token_budget=token_budget,
+            selected, scores, _ = retriever.select_bucket_with_scores(
+                problem, bucket=fallback_bucket, max_items=max_experiences, token_budget=token_budget
             )
             if selected:
-                return fallback_bucket, selected
-    return selected_bucket, {}
+                return ExperienceSelection(
+                    decision,
+                    fallback_bucket,
+                    selected,
+                    dict.fromkeys(selected, fallback_bucket),
+                    scores,
+                    False,
+                )
+    return ExperienceSelection(decision, selected_bucket, {}, {}, {}, mixed)
 
 
 def format_experiences_for_prompt(experiences: Mapping[str, str] | None) -> str:

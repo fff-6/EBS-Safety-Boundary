@@ -23,10 +23,10 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from eval_scripts.eval_ebs_redbench import (  # noqa: E402
+    _HELPERS,
     DEFAULT_CONFIG_PATH,
     ModelConfig,
     RedEvalRunConfig,
-    _HELPERS,
     _build_model_config,
     _parse_benchmark_limits,
     load_redeval_default_config,
@@ -39,9 +39,10 @@ MAIN_BENIGN_BENCHMARK = "XSTest"
 MAIN_ATTACK_METHODS = ("direct",)
 DEFAULT_TARGET_MODEL = "Qwen/Qwen3-8B"
 DEFAULT_OUTPUT_DIR = os.path.join("data", "ebs", "eval", "main_experiment")
-DEFAULT_HARMBENCH_LIMIT = 300
+DEFAULT_HARMBENCH_LIMIT = 320
 DEFAULT_EXPERIENCE_TOP_K = _HELPERS.DEFAULT_EXPERIENCE_TOP_K
 DEFAULT_EXPERIENCE_TOKEN_BUDGET = _HELPERS.DEFAULT_EXPERIENCE_TOKEN_BUDGET
+EBS_XSTEST_SEEDS = (42, 43, 44, 45, 46)
 
 
 def calculate_balance_score(harmbench_asr: float, xstest_over_refusal: float) -> float:
@@ -140,7 +141,9 @@ def build_main_metrics(summary: dict[str, Any]) -> dict[str, Any]:
         "xstest_pair_accuracy": xstest_pair_accuracy,
         "xstest_pair_correct": xstest_pair_correct,
         "xstest_pair_total": xstest_pair_total,
-        "xstest_protocol": "official_safe_and_unsafe_contrast" if summary.get("xstest_official") else "legacy_all_benign",
+        "xstest_protocol": "official_safe_and_unsafe_contrast"
+        if summary.get("xstest_official")
+        else "legacy_all_benign",
         # Paper-aligned aliases (flat)
         "HarmBench ASR": harmbench_asr,
         "XSTest BRR": xstest_over_refusal,
@@ -276,6 +279,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target_max_tokens", type=int, default=256, help="Target model max output tokens.")
     parser.add_argument("--target_max_model_len", type=int, default=4096, help="vLLM max_model_len.")
     parser.add_argument("--target_gpu_memory_utilization", type=float, default=0.8, help="vLLM GPU utilization.")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=EBS_XSTEST_SEEDS[0],
+        help="Generation seed. Full XSTest runs use 42,43,44,45,46.",
+    )
     parser.add_argument("--judge_provider", type=str, default=None, choices=["openai", "vllm", "local_transformers"])
     parser.add_argument("--judge_model", type=str, default=None, help="Override both attack/refuse judge models.")
     parser.add_argument("--judge_base_url", type=str, default=None, help="Judge model base URL override.")
@@ -295,7 +304,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def _resolve_main_benchmark_limits(args: argparse.Namespace) -> dict[str, int] | None:
-    """Apply paper defaults: HarmBench=300 and XSTest full unless overridden."""
+    """Apply full-run defaults: HarmBench=320 and XSTest full unless overridden."""
     parsed = _parse_benchmark_limits(args.benchmark_limits)
     if parsed is None:
         parsed = {}
@@ -354,6 +363,7 @@ def main() -> None:
             else None
         ),
         request_interval_seconds=float(default_target_mapping.get("request_interval_seconds", 0.0)),
+        seed=args.seed,
     )
     if not target_model.provider:
         raise ValueError(f"Target provider is not configured. Update {args.config_path} or pass --target_provider.")
@@ -416,9 +426,7 @@ def main() -> None:
         raise ValueError(f"Judge model is not configured. Update {args.config_path} or pass judge overrides.")
 
     benchmark_limits = _resolve_main_benchmark_limits(args)
-    benchmarks, harmful_benchmarks, benign_benchmarks, xstest_official, mode_subdir = _resolve_run_scope(
-        args.run_mode
-    )
+    benchmarks, harmful_benchmarks, benign_benchmarks, xstest_official, mode_subdir = _resolve_run_scope(args.run_mode)
     effective_output_dir = os.path.join(args.output_dir, mode_subdir)
 
     print(
@@ -453,7 +461,7 @@ def main() -> None:
     print("\nMain experiment metrics:")
     print(f"- HarmBench ASR: {metrics['harmbench_asr']}")
     if "xstest_safe_over_refusal" in metrics:
-            print(f"- XSTest BRR: {metrics['xstest_safe_over_refusal']}")
+        print(f"- XSTest BRR: {metrics['xstest_safe_over_refusal']}")
     if "xstest_unsafe_asr" in metrics:
         print(f"- XSTest ASR: {metrics['xstest_unsafe_asr']}")
     if "xstest_pair_accuracy" in metrics and metrics["xstest_pair_accuracy"] is not None:

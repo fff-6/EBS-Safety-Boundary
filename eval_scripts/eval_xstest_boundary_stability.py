@@ -21,17 +21,17 @@ Notes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
 import random
-import time
 import sys
+import time
 from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
-import hashlib
 
 try:
     from tqdm import tqdm  # type: ignore
@@ -286,7 +286,7 @@ def _resolve_experience_file(experience_file: str | None) -> str | None:
     checked = "\n".join(f"- {p}" for p in candidates)
     raise FileNotFoundError(
         f"Experience file not found: {experience_file}\nChecked paths:\n{checked}\n"
-        'Tip: pass --experience_file "exp/experiences 600-300.json"'
+        'Tip: pass --experience_file "artifacts/experience_banks/ebs_full_800samples_4000rollouts.json"'
     )
 
 
@@ -433,9 +433,13 @@ def main() -> None:
     default_target_mapping = default_config.get("target", {})
     default_refuse_judge_mapping = default_config.get("refuse_judge") or default_config.get("judge", {})
 
-    target_key_env = str(default_target_mapping.get("api_key_env")) if default_target_mapping.get("api_key_env") else None
+    target_key_env = (
+        str(default_target_mapping.get("api_key_env")) if default_target_mapping.get("api_key_env") else None
+    )
     judge_key_env = (
-        str(default_refuse_judge_mapping.get("api_key_env")) if default_refuse_judge_mapping.get("api_key_env") else None
+        str(default_refuse_judge_mapping.get("api_key_env"))
+        if default_refuse_judge_mapping.get("api_key_env")
+        else None
     )
 
     target_cfg = _build_model_from_config(
@@ -512,8 +516,7 @@ def main() -> None:
         "[boundary-stability] "
         f"method={method}; samples={len(samples)} (safe={safe_count}, unsafe_contrast={unsafe_count}); "
         f"generations_per_prompt={args.num_generations}; target={target_cfg.model}; judge={judge_cfg.model}; "
-        f"target_base_url={target_cfg.base_url}; judge_base_url={judge_cfg.base_url}"
-        ,
+        f"target_base_url={target_cfg.base_url}; judge_base_url={judge_cfg.base_url}",
         flush=True,
     )
     print(
@@ -566,7 +569,7 @@ def main() -> None:
                 flush=True,
             )
         except Exception as exc:
-            raise ValueError(f"Failed to load existing results for resume from {results_path}: {exc}")
+            raise ValueError(f"Failed to load existing results for resume from {results_path}: {exc}") from exc
 
     resolved_experience_file = _resolve_experience_file(args.experience_file) if method == "EBS" else None
     experience_text = load_experience_text(resolved_experience_file)
@@ -601,7 +604,9 @@ def main() -> None:
                 pbar.update(min(len(completed_keys), len(samples)))
 
     for idx, sample in iterator:
-        sample_key = _record_key({"sample_id": sample.get("sample_id"), "benchmark_index": sample.get("benchmark_index")})
+        sample_key = _record_key(
+            {"sample_id": sample.get("sample_id"), "benchmark_index": sample.get("benchmark_index")}
+        )
         if sample_key in completed_keys:
             continue
 
@@ -626,7 +631,10 @@ def main() -> None:
         for gen_idx in range(1, args.num_generations + 1):
             if args.debug_requests:
                 started = time.time()
-                print(f"[boundary-stability] call target prompt={idx}/{len(samples)} gen={gen_idx}/{args.num_generations}", flush=True)
+                print(
+                    f"[boundary-stability] call target prompt={idx}/{len(samples)} gen={gen_idx}/{args.num_generations}",
+                    flush=True,
+                )
 
             response = target_llm.batch_generate([final_prompt], target_sampling)[0]
             responses.append(response)
@@ -676,10 +684,10 @@ def main() -> None:
 
         refusal_judges = _postprocess_refusal_judgments(responses, refusal_raw_judges)
         decision_labels = [
-            "refusal"
-            if refusal_label == "refusal"
-            else _coerce_decision_label(decision_raw, response)
-            for refusal_label, decision_raw, response in zip(refusal_judges, decision_raw_judges, responses)
+            "refusal" if refusal_label == "refusal" else _coerce_decision_label(decision_raw, response)
+            for refusal_label, decision_raw, response in zip(
+                refusal_judges, decision_raw_judges, responses, strict=False
+            )
         ]
         counts = Counter(decision_labels)
         majority = max(counts.values()) if counts else 0
@@ -717,9 +725,8 @@ def main() -> None:
         if idx % progress_every == 0 or idx == len(samples):
             print(
                 f"[boundary-stability] progress {idx}/{len(samples)} | "
-                f"avg_consistency={sum(per_prompt_consistency)/len(per_prompt_consistency):.4f} | "
-                f"flip_rate={flips/len(per_prompt_consistency):.4f}"
-                ,
+                f"avg_consistency={sum(per_prompt_consistency) / len(per_prompt_consistency):.4f} | "
+                f"flip_rate={flips / len(per_prompt_consistency):.4f}",
                 flush=True,
             )
 
@@ -757,7 +764,9 @@ def main() -> None:
         "sample_counts": {"safe": safe_count, "unsafe_contrast": unsafe_count},
         "target_model": asdict(target_cfg),
         "decision_judge_model": asdict(judge_cfg),
-        "Consistency Score": sum(per_prompt_consistency) / len(per_prompt_consistency) if per_prompt_consistency else 0.0,
+        "Consistency Score": sum(per_prompt_consistency) / len(per_prompt_consistency)
+        if per_prompt_consistency
+        else 0.0,
         "Flip Rate": flips / len(per_prompt_consistency) if per_prompt_consistency else 0.0,
         "definition": {
             "decision_labels": "Per generation, the response is classified as one of: answer, refusal, safe_transformation.",

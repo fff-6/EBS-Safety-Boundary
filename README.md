@@ -1,8 +1,11 @@
 # EBS
 
+EBS is a training-free safety-boundary calibration method that uses repeated rollouts, general and risk-aware evaluation, and critique to distill effective strategies for harmful, benign, and ethical requests into categorized experience banks.
+At inference time, it routes each request, retrieves relevant experiences, and injects them as context to strengthen harmful-request refusal while reducing over-refusal of benign requests without updating model parameters.
+
 ## 🚀 Getting Started
 
-Follow the steps below to configure the environment, build an experience bank, and run the paper experiments.
+Follow the steps below to configure the environment, build an experience bank, and run the complete experiment workflow.
 
 ### 1. Setup
 
@@ -60,7 +63,7 @@ On Linux or macOS:
 cp .env.example .env
 ```
 
-Edit `.env` and configure the target and judge models. The defaults below match the paper's main model setup:
+Edit `.env` and configure the target and judge models. The defaults below match the project default model setup:
 
 ```ini
 EBS_LLM_TYPE=chat.completions
@@ -80,11 +83,11 @@ ATTACK_JUDGE_API_KEY=replace-me
 OPENAI_API_KEY=replace-me
 ```
 
-The paper uses Qwen3-8B as the main target model and Qwen3-14B as the automatic judge. Replace the example URLs and
+The project uses Qwen3-8B as the default target model and Qwen3-14B as the automatic judge. Replace the example URLs and
 keys with any hosted service or local endpoint that supports OpenAI-compatible Chat Completions. Python 3.12 is the
-source-code requirement, not a hardware claim from the paper.
+source-code requirement and is independent of the inference hardware.
 
-For reference, the paper reports Ubuntu 22.x, an NVIDIA GeForce RTX 4060, and 32 GB RAM. Matching this hardware is
+A reference environment uses Ubuntu 22.x, an NVIDIA GeForce RTX 4060, and 32 GB RAM. Matching this hardware is
 not required when the target and judge models are accessed through APIs; local inference requires suitable GPU memory.
 
 Run the tests:
@@ -117,15 +120,15 @@ Use `ebs/train.py` to generate experience.
 - `--experience_update_method`: Use `critique` or `summary` to update experience.
 - `--task_timeout`: Timeout per task in seconds.
 
-The following command uses 20 harmful, 20 benign, and 20 ethics samples with the generation settings from Section
-4.3 of the paper:
+The full experience-bank build uses 400 harmful, 200 benign, and 200 ethics samples. It generates five independent raw
+rollouts per sample; experiences accumulated from earlier batches are not injected during construction.
 
 ```bash
 uv run python ebs/train.py \
   --mode agent \
   --domain ebs \
-  --experiment_name ebs_three_bucket \
-  --dataset dataset/wildjailbreak_harmful.jsonl:20,dataset/star_benign.jsonl:20,dataset/evil_data.jsonl:20 \
+  --experiment_name ebs_full_experience_construction \
+  --dataset dataset/wildjailbreak_harmful.jsonl:400,dataset/star_benign.jsonl:200,dataset/evil_data.jsonl:200 \
   --epochs 1 \
   --batchsize 20 \
   --grpo_n 5 \
@@ -136,7 +139,9 @@ uv run python ebs/train.py \
   --task_timeout 1800
 ```
 
-Place the training files in `dataset/`. See `dataset/README.md` for the accepted format.
+Place the training files in `dataset/`. See `dataset/README.md` for the accepted format. The complete command is also
+available as `scripts/run_full_experience_construction.ps1`. The optional `--iterative_experience_construction`
+flag is reserved for the iterative-construction ablation and is disabled in the default full workflow.
 
 ### 3. Reuse the Experience Bank
 
@@ -159,7 +164,7 @@ uv run python ebs/main.py \
   --experiment_name ebs_reuse \
   --dataset dataset/evil_data.jsonl \
   --dataset_truncate 20 \
-  --experience_file "exp/experiences 600-300.json" \
+  --experience_file "artifacts/experience_banks/ebs_full_800samples_4000rollouts.json" \
   --rollout_concurrency 5
 ```
 
@@ -182,7 +187,7 @@ Qwen3-8B Vanilla:
 uv run python -m eval_scripts.eval_ebs_main_experiment \
   --experiment_name qwen3_8b_vanilla \
   --run_mode combined \
-  --benchmark_limits "HarmBench:300" \
+  --benchmark_limits "HarmBench:320" \
   --target_model "Qwen/Qwen3-8B"
 ```
 
@@ -192,9 +197,9 @@ Qwen3-8B + EBS:
 uv run python -m eval_scripts.eval_ebs_main_experiment \
   --experiment_name qwen3_8b_ebs \
   --run_mode combined \
-  --benchmark_limits "HarmBench:300" \
+  --benchmark_limits "HarmBench:320" \
   --target_model "Qwen/Qwen3-8B" \
-  --experience_file "exp/experiences 600-300.json"
+  --experience_file "artifacts/experience_banks/ebs_full_800samples_4000rollouts.json"
 ```
 
 XSTest:
@@ -204,5 +209,23 @@ uv run python -m eval_scripts.eval_ebs_main_experiment \
   --experiment_name qwen3_8b_xstest_ebs \
   --run_mode xstest \
   --target_model "Qwen/Qwen3-8B" \
-  --experience_file "exp/experiences 600-300.json"
+  --experience_file "artifacts/experience_banks/ebs_full_800samples_4000rollouts.json"
 ```
+
+Retrieval defaults are `K=8`, routing threshold `delta=0.35`, and a strict low-confidence split of
+`primary_k=6` plus `secondary_k=2`. The default workflow uses deterministic 256-dimensional hash embeddings and no
+retrieval token truncation (`token_budget=0`) so that the requested K is preserved. Run the full construction script
+first to generate `ebs_full_800samples_4000rollouts.json`.
+
+The main XSTest comparison uses seeds `42,43,44,45,46`. Run
+`scripts/run_xstest_five_seeds.ps1` to execute and aggregate the five runs. The target generation defaults are
+`temperature=0.6`, `top_p=0.9`, and `max_tokens=256`; the Qwen3-14B judge defaults are `temperature=0.2`,
+`top_p=0.9`, and `max_tokens=16`.
+
+## Complete workflow
+
+Before paid runs, validate local data with `uv run python scripts/validate_experiment_inputs.py`; smoke tests verify only the environment and must not be treated as formal results.
+
+Run `scripts/run_full_experience_construction.ps1` followed by `scripts/run_xstest_five_seeds.ps1` to rebuild the frozen 800-sample/4000-rollout bank and evaluate five-seed Vanilla/EBS XSTest results. The formal main protocol uses 320 HarmBench prompts and full XSTest (250 safe + 200 unsafe contrast).
+
+Formal results use the experience bank and manifest produced by the full construction workflow.

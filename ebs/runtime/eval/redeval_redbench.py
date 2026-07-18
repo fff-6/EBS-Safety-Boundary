@@ -188,7 +188,7 @@ def _postprocess_refusal_judgments(responses: list[str], judges: list[str]) -> l
     """Normalize clear refusal responses that the refusal judge mislabeled as compliance."""
 
     normalized_judges: list[str] = []
-    for response, judge in zip(responses, judges):
+    for response, judge in zip(responses, judges, strict=False):
         cleaned = judge.strip().lower()
         if "compliance" in cleaned and _should_override_to_refusal(response):
             normalized_judges.append("refusal")
@@ -422,11 +422,10 @@ class OpenAICompatibleLLM:
         else:
             try:
                 timeout_seconds = float(timeout_env)
-            except ValueError:
+            except ValueError as exc:
                 raise ValueError(
-                    "Invalid EBS_OPENAI_TIMEOUT_SECONDS. Expected a number of seconds, "
-                    f"got: {timeout_env!r}"
-                )
+                    f"Invalid EBS_OPENAI_TIMEOUT_SECONDS. Expected a number of seconds, got: {timeout_env!r}"
+                ) from exc
             if timeout_seconds <= 0:
                 timeout_seconds = None
 
@@ -562,6 +561,8 @@ class LocalTransformersLLM:
     def batch_generate(self, queries: list[str], sampling_params: dict[str, Any]) -> list[str]:
         import torch
 
+        if sampling_params.get("seed") is not None:
+            torch.manual_seed(int(sampling_params["seed"]))
         temperature = float(sampling_params.get("temperature", 0.6))
         top_p = float(sampling_params.get("top_p", 0.9))
         max_new_tokens = int(sampling_params.get("max_tokens", 1024))
@@ -612,6 +613,7 @@ def build_model_config_from_mapping(mapping: dict[str, Any]) -> ModelConfig:
             float(mapping["gpu_memory_utilization"]) if mapping.get("gpu_memory_utilization") is not None else None
         ),
         request_interval_seconds=float(mapping.get("request_interval_seconds", 0.0)),
+        seed=int(mapping["seed"]) if mapping.get("seed") is not None else None,
     )
 
 
@@ -630,6 +632,7 @@ class ModelConfig:
     max_model_len: int | None = 4096
     gpu_memory_utilization: float | None = 0.8
     request_interval_seconds: float = 0.0
+    seed: int | None = None
 
     @property
     def output_name(self) -> str:
@@ -645,6 +648,8 @@ class ModelConfig:
                 "top_p": self.top_p,
                 "max_tokens": self.max_tokens,
             }
+            if self.seed is not None:
+                sampling_params["seed"] = self.seed
             return (
                 OpenAICompatibleLLM(
                     self.model,
@@ -670,6 +675,8 @@ class ModelConfig:
                 "top_p": self.top_p,
                 "max_tokens": self.max_tokens,
             }
+            if self.seed is not None:
+                sampling_params["seed"] = self.seed
             return vllm_class(model_kwargs), sampling_params
 
         if self.provider == "local_transformers":
@@ -678,11 +685,11 @@ class ModelConfig:
                 "top_p": self.top_p,
                 "max_tokens": self.max_tokens,
             }
+            if self.seed is not None:
+                sampling_params["seed"] = self.seed
             return LocalTransformersLLM(self.model, trust_remote_code=self.trust_remote_code), sampling_params
 
-        raise ValueError(
-            f"Unsupported provider `{self.provider}`. Expected `openai`, `vllm`, or `local_transformers`."
-        )
+        raise ValueError(f"Unsupported provider `{self.provider}`. Expected `openai`, `vllm`, or `local_transformers`.")
 
 
 @dataclass(slots=True)
@@ -743,14 +750,10 @@ def load_redbench_records(
                 continue
             for record in records:
                 benchmark_index = benchmark_counts[benchmark_name]
-                xstest_label = (
-                    infer_xstest_official_label(benchmark_index) if benchmark_name == "XSTest" else None
-                )
+                xstest_label = infer_xstest_official_label(benchmark_index) if benchmark_name == "XSTest" else None
                 if benchmark_limits and benchmark_name == "XSTest" and xstest_label:
                     label_limit_keys = (
-                        ("XSTestSafe",)
-                        if xstest_label == "safe"
-                        else ("XSTestUnsafe", "XSTestUnsafeContrast")
+                        ("XSTestSafe",) if xstest_label == "safe" else ("XSTestUnsafe", "XSTestUnsafeContrast")
                     )
                     label_limit = next(
                         (benchmark_limits[key] for key in label_limit_keys if key in benchmark_limits),
@@ -762,7 +765,9 @@ def load_redbench_records(
                 if benchmark_limits and benchmark_name in benchmark_limits:
                     if benchmark_counts[benchmark_name] >= benchmark_limits[benchmark_name]:
                         continue
-                prompt = record.get("prompt") or record.get("question") or record.get("instruction") or record.get("query")
+                prompt = (
+                    record.get("prompt") or record.get("question") or record.get("instruction") or record.get("query")
+                )
                 if not prompt:
                     continue
 
@@ -993,9 +998,7 @@ def restore_point_checkpoint(points: list[dict[str, Any]], output_dir: Path, fil
     with open(checkpoint_path, encoding="utf-8") as file:
         existing_points = json.load(file)
     existing_by_key = {
-        _point_key(point): point
-        for point in existing_points
-        if point.get("responses") or point.get("judges")
+        _point_key(point): point for point in existing_points if point.get("responses") or point.get("judges")
     }
     restored = 0
     for point in points:
@@ -1075,7 +1078,9 @@ def save_points(points: list[dict[str, Any]], output_dir: Path, filename: str = 
 def evaluate_logs(log_dir: Path, judge_model: ModelConfig, evaluation_type: str) -> Path:
     """Run RedEval-style evaluation over one log directory."""
     judge_llm, sampling_params = judge_model.build_llm()
-    files = [path for path in log_dir.iterdir() if path.suffix == ".json" and not path.name.startswith(("eval_", "metric_"))]
+    files = [
+        path for path in log_dir.iterdir() if path.suffix == ".json" and not path.name.startswith(("eval_", "metric_"))
+    ]
     for file_path in files:
         eval_path = log_dir / f"eval_{file_path.name}"
         resume_path = eval_path if eval_path.exists() else file_path
@@ -1110,7 +1115,8 @@ def evaluate_logs(log_dir: Path, judge_model: ModelConfig, evaluation_type: str)
                 template = EVALUATE_REFUSE_TEMPLATE
             judge_responses = [_extract_final_answer_for_judge(response) for response in responses]
             queries = [
-                template.format(prompt=prompt, response=response) for prompt, response in zip(prompts, judge_responses)
+                template.format(prompt=prompt, response=response)
+                for prompt, response in zip(prompts, judge_responses, strict=False)
             ]
             point["judges"] = judge_llm.batch_generate(queries, sampling_params) if queries else []
             if evaluation_type == "refusal" and point["judges"]:
@@ -1370,7 +1376,9 @@ def run_redeval_redbench(config: RedEvalRunConfig) -> dict[str, Any]:
 
     for benchmark, benchmark_samples in harmful_groups.items():
         for method_name in config.attack_methods:
-            print(f"[phase] target inference for attack benchmark={benchmark}, method={method_name}, samples={len(benchmark_samples)}")
+            print(
+                f"[phase] target inference for attack benchmark={benchmark}, method={method_name}, samples={len(benchmark_samples)}"
+            )
             points = build_attack_points(
                 samples=benchmark_samples,
                 method_name=method_name,
@@ -1386,7 +1394,9 @@ def run_redeval_redbench(config: RedEvalRunConfig) -> dict[str, Any]:
             evaluate_logs(output_dir, attack_judge_model, evaluation_type="attack")
 
     for benchmark, benchmark_samples in benign_groups.items():
-        print(f"[phase] target inference for refuse benchmark={benchmark}, method=base, samples={len(benchmark_samples)}")
+        print(
+            f"[phase] target inference for refuse benchmark={benchmark}, method=base, samples={len(benchmark_samples)}"
+        )
         points = build_refuse_points(
             benchmark_samples,
             experience_text=experience_text,
@@ -1418,13 +1428,7 @@ def run_redeval_redbench(config: RedEvalRunConfig) -> dict[str, Any]:
                 experience_token_budget=config.experience_token_budget,
             )
             output_dir = (
-                run_dir
-                / "logs"
-                / "xstest_official"
-                / split_name
-                / "XSTest"
-                / "base"
-                / config.target_model.output_name
+                run_dir / "logs" / "xstest_official" / split_name / "XSTest" / "base" / config.target_model.output_name
             )
             run_inference(points, target_llm, refuse_sampling_params, checkpoint_dir=output_dir)
             save_points(points, output_dir)

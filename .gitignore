@@ -48,9 +48,10 @@ wheels/
 /logs/
 /workspace/
 /exp/*
-!/exp/experiences 600-300.json
 /dataset/*
 !/dataset/README.md
+/artifacts/data_indices/*
+/artifacts/experience_banks/ebs_full_*.json
 /test.db
 /docs/internal/
 /outputs/

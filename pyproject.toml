@@ -144,6 +144,15 @@ select = [
 ]
 isort = { combine-as-imports = true, known-first-party = ["ebs"] }
 
+[tool.ruff.lint.per-file-ignores]
+# These files contain experiment prompts and long diagnostic messages. Wrapping
+# their string literals would change the text sent to models or written to logs.
+"ebs/core/prompts.py" = ["E501"]
+"ebs/runtime/eval/redeval_redbench.py" = ["E501"]
+"ebs/train.py" = ["E402"]
+"eval_scripts/eval_ebs_main_experiment.py" = ["E501"]
+"eval_scripts/eval_xstest_boundary_stability.py" = ["E501"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 

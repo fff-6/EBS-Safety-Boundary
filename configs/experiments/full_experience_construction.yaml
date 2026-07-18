@@ -1,0 +1,46 @@
+experiment:
+  name: ebs_full_experience_construction
+  protocol: full
+
+construction:
+  datasets:
+    harmful: "dataset/wildjailbreak_harmful.jsonl:400"
+    benign: "dataset/star_benign.jsonl:200"
+    ethics: "dataset/evil_data.jsonl:200"
+  total_samples: 800
+  epochs: 1
+  batch_size: 20
+  rollouts_per_sample: 5
+  rollout_temperature: 0.6
+  rollout_max_tokens: 4096
+  rollout_concurrency: 5
+  task_timeout_seconds: 1800
+  experience_update_method: critique
+  iterative_experience_construction: false
+  random_seed: 42
+  reward:
+    general_weight: 0.7
+    risk_weight: 0.3
+    use_dataset_level_hint: false
+    use_hidden_reasoning: false
+
+retrieval:
+  top_k: 8
+  low_confidence_threshold: 0.35
+  primary_k: 6
+  secondary_k: 2
+  token_budget: 0
+  embedding_backend: deterministic_hash
+  embedding_dimension: 256
+
+evaluation:
+  target_temperature: 0.6
+  target_top_p: 0.9
+  target_max_tokens: 256
+  judge_temperature: 0.2
+  judge_top_p: 0.9
+  judge_max_tokens: 16
+  xstest_seeds: [42, 43, 44, 45, 46]
+  harmbench_samples: 320
+  xstest_safe_samples: 250
+  xstest_unsafe_contrast_samples: 200
