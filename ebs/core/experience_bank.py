@@ -11,8 +11,6 @@ from typing import Any
 
 import numpy as np
 
-from ebs.runtime.utils.token import TokenUtils
-
 CATEGORY_KEYS = ("harmful", "benign", "ethics")
 _CATEGORY_PREFIX = {"harmful": "H", "benign": "B", "ethics": "E"}
 
@@ -134,12 +132,73 @@ _MEDICAL_OR_EDUCATIONAL_CONTEXT_HINTS = (
 )
 
 _TECHNICAL_OR_SYSTEM_CONTEXT_HINTS = (
+    # Process / system administration
     "software process",
     "operating system",
     "computer program",
     "system administration",
     "authorized security testing",
     "defensive cybersecurity",
+    "kill a process",
+    "frozen process",
+    "unresponsive process",
+    "unresponsive program",
+    "stop a process",
+    "terminate a process",
+    "terminate a program",
+    "force quit",
+    "task manager",
+    "background process",
+    "process id",
+    "daemon process",
+    # Operating systems / platforms
+    "linux",
+    "ubuntu",
+    "debian",
+    "centos",
+    "fedora",
+    "macos",
+    "windows server",
+    "unix",
+    "bash",
+    "shell",
+    "command line",
+    "terminal",
+    "systemctl",
+    "systemd",
+    # Programming / development
+    "python script",
+    "python program",
+    "python code",
+    "code example",
+    "programming language",
+    "debug",
+    "compiler error",
+    "stack trace",
+    "git command",
+    "package manager",
+    "error message",
+    # Infrastructure / DevOps
+    "docker",
+    "kubernetes",
+    "nginx",
+    "apache",
+    "ssh",
+    "firewall",
+    "log file",
+    "database",
+    "api endpoint",
+)
+
+# Harmful-intent hint strings that have legitimate meanings in a technical
+# computing context.  When the *only* harmful signals belong to this set and
+# a technical frame is detected, the router treats the query as benign.
+_TECHNICALLY_AMBIGUOUS_HARMFUL_TOKENS: frozenset[str] = frozenset(
+    {
+        "kill",  # "kill a process", "kill -9"
+        "physical harm",  # "physically harm the hardware"
+        "evade detection",  # "how malware evades detection" (research)
+    }
 )
 
 _BENIGN_EXPOSITORY_PREFIXES = (
@@ -154,6 +213,73 @@ _BENIGN_EXPOSITORY_PREFIXES = (
     "describe",
     "explain",
 )
+
+_TECHNICAL_SIGNAL_WORDS = (
+    "linux",
+    "ubuntu",
+    "debian",
+    "centos",
+    "fedora",
+    "macos",
+    "unix",
+    "windows",
+    "bash",
+    "shell",
+    "terminal",
+    "command",
+    "docker",
+    "kubernetes",
+    "nginx",
+    "apache",
+    "ssh",
+    "firewall",
+    "python",
+    "javascript",
+    "java",
+    "golang",
+    "rust",
+    "compiler",
+    "debug",
+    "runtime",
+    "exception",
+    "syntax",
+    "git",
+    "api",
+    "database",
+    "sql",
+    "json",
+    "xml",
+    "config",
+    "log",
+    "server",
+    "daemon",
+    "kernel",
+    "driver",
+    "binary",
+    "thread",
+    "socket",
+    "protocol",
+    "port",
+    "service",
+    "package",
+    "module",
+    "library",
+    "framework",
+    "systemd",
+    "process",
+)
+
+
+def _detect_technical_context(normalized_problem: str) -> bool:
+    """Detect whether a request is framed in a technical/system-administration context.
+
+    Returns True when 2+ technical signal words are found as whole words,
+    indicating the request is likely a technical query rather than a harmful one.
+    """
+    words = set(normalized_problem.split())
+    hits = sum(1 for word in _TECHNICAL_SIGNAL_WORDS if word in words)
+    return hits >= 2
+
 
 _COMPILED_MULTI_SPACE = re.compile(r"\s+")
 DEFAULT_EXPERIENCE_TOP_K = 8
@@ -267,6 +393,8 @@ def _normalize_problem(problem: str) -> str:
 
 
 def _count_experience_tokens(exp_id: str, text: str) -> int:
+    from ebs.runtime.utils.token import TokenUtils
+
     return TokenUtils.count_tokens(f"[{exp_id}]. {text}")
 
 
@@ -526,9 +654,18 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
 
     is_expository = _starts_with_any(normalized, _BENIGN_EXPOSITORY_PREFIXES)
 
+    _has_strong_harmful = len(harmful_hits) >= 2 or bool(privacy_hits)
+    _harmful_signal_is_ambiguous = all(
+        h in _TECHNICALLY_AMBIGUOUS_HARMFUL_TOKENS for h in harmful_hits
+    )
+
     if operational_hits:
-        scores["harmful"] += 1.5
-        reason_tags.append("operational_request")
+        if _detect_technical_context(normalized) and not _has_strong_harmful and _harmful_signal_is_ambiguous:
+            scores["benign"] += 1.5
+            reason_tags.append("operational_technical_context")
+        else:
+            scores["harmful"] += 1.5
+            reason_tags.append("operational_request")
     if harmful_hits:
         scores["harmful"] += min(6.0, 1.25 * len(harmful_hits))
         reason_tags.append("harmful_semantics")
@@ -579,11 +716,14 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         scores["benign"] = max(scores["benign"], scores["harmful"] + 1.0)
         reason_tags.append("favor_benign_for_fictional_context")
     if technical_hits and harmful_hits and not privacy_hits:
-        scores["benign"] = max(scores["benign"], scores["harmful"] + 0.5)
-        reason_tags.append("favor_benign_for_technical_context")
+        if _harmful_signal_is_ambiguous:
+            scores["benign"] = max(scores["benign"], scores["harmful"] + 0.5)
+            reason_tags.append("favor_benign_for_technical_context")
+        else:
+            reason_tags.append("retain_harmful_despite_technical_context")
 
     if (harmful_hits or privacy_hits) and (operational_hits or privacy_hits):
-        if technical_hits and not privacy_hits:
+        if technical_hits and not privacy_hits and _harmful_signal_is_ambiguous:
             reason_tags.append("skip_harmful_override_due_to_benign_context")
         elif fictional_hits and privacy_hits:
             reason_tags.append("skip_harmful_override_due_to_benign_context")
@@ -608,7 +748,13 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
     secondary_bucket, second_score = ranked[1]
     confidence = _confidence_from_scores(top_score, second_score)
 
-    if second_score <= 0 or (top_score - second_score) > 2.5:
+    preserve_secondary_for_contextual_risk = (
+        primary_bucket == "benign"
+        and secondary_bucket == "harmful"
+        and bool(harmful_hits or privacy_hits)
+        and bool(fictional_hits or educational_hits or technical_hits)
+    )
+    if second_score <= 0 or ((top_score - second_score) > 2.5 and not preserve_secondary_for_contextual_risk):
         secondary_bucket = None
 
     return RoutingDecision(
