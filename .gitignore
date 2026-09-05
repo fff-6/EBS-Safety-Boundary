@@ -47,6 +47,9 @@ wheels/
 /site/
 /logs/
 /workspace/
+/results/
+/checkpoints/
+/wandb/
 /exp/*
 /dataset/*
 !/dataset/README.md
@@ -55,6 +58,15 @@ wheels/
 /test.db
 /docs/internal/
 /outputs/
+
+# Third-party baseline clones and local comparison implementations
+/baselines/
+/JailbreakDefense_GoalPriority-master/
+/Reasoning-to-Defend-main/
+/Self-Reminder-master/
+/or-bench-main/
+/temporary_goal_priority_eval/
+/temporary_self_reminder_eval/
 
 # Keep placeholder docs in otherwise ignored output directories
 !/data/

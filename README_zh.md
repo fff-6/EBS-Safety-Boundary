@@ -1,5 +1,4 @@
 # EBS
-
 EBS 是一种无需参数更新的安全边界校准方法，通过多次 Rollout、通用与风险双重评分及 Critique，将有害、正常和伦理请求中的有效处理策略提炼为分类经验库。
 推理时，EBS 根据请求文本路由并检索相关经验注入上下文，从而在不更新模型参数的情况下增强有害请求拒绝能力，同时减少对正常请求的过度拒绝。
 
@@ -151,6 +150,7 @@ uv run python ebs/train.py \
 - `--dataset`：评测数据。
 - `--dataset_truncate`：只运行前 N 条数据。
 - `--experience_file`：经验库文件。
+- `--router_version`：默认使用 `v2_rule`；`legacy` 仅用于受控对照。
 - `--rollout_concurrency`：并发数。
 - `--rollout_model`：目标模型。
 - `--judge_model`：Judge 模型。
@@ -210,8 +210,9 @@ uv run python -m eval_scripts.eval_ebs_main_experiment \
   --experience_file "artifacts/experience_banks/ebs_full_800samples_4000rollouts.json"
 ```
 
-项目检索默认值为：`K=8`、路由阈值 `delta=0.35`，低置信度时严格按主桶 6 条、次桶 2 条检索。
-当前默认使用确定性的 256 维哈希向量，并将检索 token budget 设为 `0`（不截断），从而保证实际注入
+项目检索默认值为：`K=8`、路由阈值 `delta=0.35`。低置信度请求采用动态混合检索：联合召回主桶与
+次桶候选，给予主桶较小的分数增益后统一排序，并选取全局 Top-K。当前默认使用确定性的 256 维
+哈希向量，并将检索 token budget 设为 `0`（不截断），从而保证实际注入
 数量与 K 一致。运行完整实验前，请先执行经验库构建脚本，生成
 `ebs_full_800samples_4000rollouts.json`。
 

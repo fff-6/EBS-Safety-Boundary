@@ -3,7 +3,7 @@
 EBS is a training-free safety-boundary calibration method that uses repeated rollouts, general and risk-aware evaluation, and critique to distill effective strategies for harmful, benign, and ethical requests into categorized experience banks.
 At inference time, it routes each request, retrieves relevant experiences, and injects them as context to strengthen harmful-request refusal while reducing over-refusal of benign requests without updating model parameters.
 
-## 🚀 Getting Started
+## 馃殌 Getting Started
 
 Follow the steps below to configure the environment, build an experience bank, and run the complete experiment workflow.
 
@@ -153,6 +153,7 @@ Use `ebs/main.py` to run EBS on a local dataset.
 - `--dataset`: Evaluation data.
 - `--dataset_truncate`: Run only the first N samples.
 - `--experience_file`: Experience-bank file.
+- `--router_version`: `v2_rule` (default) or `legacy` for controlled comparisons.
 - `--rollout_concurrency`: Number of concurrent tasks.
 - `--rollout_model`: Target model override.
 - `--judge_model`: Judge model override.
@@ -212,8 +213,9 @@ uv run python -m eval_scripts.eval_ebs_main_experiment \
   --experience_file "artifacts/experience_banks/ebs_full_800samples_4000rollouts.json"
 ```
 
-Retrieval defaults are `K=8`, routing threshold `delta=0.35`, and a strict low-confidence split of
-`primary_k=6` plus `secondary_k=2`. The default workflow uses deterministic 256-dimensional hash embeddings and no
+Retrieval defaults are `K=8` and routing threshold `delta=0.35`. Low-confidence requests use dynamic mixed retrieval:
+candidates from the primary and secondary memories are jointly ranked, with a small primary-memory score boost, and
+the global Top-K rules are selected. The default workflow uses deterministic 256-dimensional hash embeddings and no
 retrieval token truncation (`token_budget=0`) so that the requested K is preserved. Run the full construction script
 first to generate `ebs_full_800samples_4000rollouts.json`.
 

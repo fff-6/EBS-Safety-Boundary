@@ -16,14 +16,12 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from ebs.llm import LLM
-from ebs.core.experience_bank import (
-    normalize_experience_bank,
-)
-from ebs.runtime.agents import SimpleAgent
-from ebs.runtime.agents.common import TaskRecorder
-from ebs.runtime.config import ConfigLoader
-from ebs.runtime.utils import AgentsUtils
+from ebs.core.experience_bank import normalize_experience_bank  # noqa: E402
+from ebs.llm import LLM  # noqa: E402
+from ebs.runtime.agents import SimpleAgent  # noqa: E402
+from ebs.runtime.agents.common import TaskRecorder  # noqa: E402
+from ebs.runtime.config import ConfigLoader  # noqa: E402
+from ebs.runtime.utils import AgentsUtils  # noqa: E402
 
 
 def _load_project_env() -> None:
@@ -221,12 +219,14 @@ async def rollout_dataset(
 
                 if sample["retry_count"] <= max_retries:
                     tqdm.write(
-                        f"Worker {name}: Task runid={sample['runid']} failed with {type(e).__name__}. Retrying ({sample['retry_count']}/{max_retries})..."
+                        f"Worker {name}: Task runid={sample['runid']} failed with {type(e).__name__}. "
+                        f"Retrying ({sample['retry_count']}/{max_retries})..."
                     )
                     await task_queue.put(sample)  # Re-queue the task
                 else:
                     tqdm.write(
-                        f"Worker {name}: Task runid={sample['runid']} failed after {max_retries} retries. Error: {e}. Traceback: {error_info}"
+                        f"Worker {name}: Task runid={sample['runid']} failed after {max_retries} retries. "
+                        f"Error: {e}. Traceback: {error_info}"
                     )
                     sample.update(
                         {
@@ -342,6 +342,7 @@ async def main(args):
                 each["problem"],
                 experiences=experiences,
                 disable_experience_retrieval=args.disable_experience_retrieval,
+                router_version=args.router_version,
             )
             formatted_test_data.append(
                 {
@@ -397,14 +398,21 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode", type=str, default="agent", required=True, choices=["prompt", "agent"], help="Mode of inference"
     )
-    parser.add_argument(
-        "--domain", type=str, required=True, choices=["ebs"], help="The domain of the experiment"
-    )
+    parser.add_argument("--domain", type=str, required=True, choices=["ebs"], help="The domain of the experiment")
     parser.add_argument("--experiment_name", type=str, required=True, help="Name of the experiment run")
     parser.add_argument("--dataset", type=str, required=True, help="Name of dataset")
     parser.add_argument("--dataset_truncate", type=int, default=None, help="Truncate dataset to first N samples")
     parser.add_argument("--experience_file", type=str, default=None)
-    parser.add_argument("--skip_verify", action="store_true", help="Skip judge-model verification to measure raw inference cost only.")
+    parser.add_argument(
+        "--router_version",
+        type=str,
+        default="v2_rule",
+        choices=["legacy", "v2_rule"],
+        help="Experience router version. The final EBS v2 router is the default.",
+    )
+    parser.add_argument(
+        "--skip_verify", action="store_true", help="Skip judge-model verification to measure raw inference cost only."
+    )
     parser.add_argument(
         "--disable_experience_retrieval",
         action="store_true",

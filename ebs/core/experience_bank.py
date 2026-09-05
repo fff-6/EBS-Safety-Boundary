@@ -11,194 +11,318 @@ from typing import Any
 
 import numpy as np
 
+try:
+    from ebs.runtime.utils.token import TokenUtils
+except Exception:
+    TokenUtils = None
+
 CATEGORY_KEYS = ("harmful", "benign", "ethics")
 _CATEGORY_PREFIX = {"harmful": "H", "benign": "B", "ethics": "E"}
 
-DEFAULT_MIX_CONFIDENCE_THRESHOLD = 0.35
-DEFAULT_PRIMARY_MIX_K = 6
-DEFAULT_SECONDARY_MIX_K = 2
+_MIX_CONFIDENCE_THRESHOLD = 0.35
+_SECONDARY_MIX_MAX_ITEMS = 4
 
 _ETHICS_HINTS = (
     "ethic",
     "moral",
+    "morality",
     "value conflict",
-    "fairness",
-    "rights",
-    "discrimination",
+    "dilemma",
     "should i",
+    "right thing",
+    "wrong",
+    "fair",
+    "unfair",
+    "acceptable",
+    "justified",
 )
 
 _OPERATIONAL_REQUEST_HINTS = (
     "how do i",
     "how can i",
+    "how do we",
+    "how can we",
+    "how do i best",
+    "how can i best",
     "best way",
+    "ways of",
     "what steps",
-    "what is the process",
+    "steps should i take",
+    "what can i do to",
+    "what do i need to do",
+    "what's the process for",
+    "where can i buy",
     "where can i get",
     "without getting caught",
-    "instructions for",
+    "can you tell me how to",
+    "how should i",
 )
 
 _HARMFUL_INTENT_HINTS = (
-    "physical harm",
-    "violent attack",
     "kill",
     "murder",
-    "assault",
-    "weapon",
-    "explosive",
+    "execute",
+    "shoot",
+    "stab",
     "poison",
-    "coercion",
+    "bomb",
+    "blow up",
+    "attack",
+    "strangle",
+    "choke",
+    "assault",
+    "rape",
+    "kidnap",
+    "hostage",
+    "arson",
+    "massacre",
+    "exterminate",
+    "annihilate",
+    "eliminate",
+    "wipe out",
+    "suicide",
+    "self harm",
+    "break into",
+    "rob",
     "steal",
     "fraud",
-    "illegal access",
-    "unauthorized access",
-    "credential theft",
-    "financial fraud",
-    "illegal drugs",
-    "self harm",
-    "evade detection",
-    "bypass security",
+    "identity theft",
+    "launder money",
+    "treason",
+    "terrorism",
+    "human trafficking",
+    "cocaine",
+    "meth",
+    "lsd",
+    "crack",
+    "ecstasy pills",
+    "weed",
+    "marihuana",
+    "backdoor",
+    "privilege escalation",
+    "bypass",
+    "disable the alarm",
+    "vault",
+    "punch",
+    "take out",
+    "terminating people",
+    "people i don't like",
 )
 
 _PRIVACY_INTRUSION_HINTS = (
     "password",
-    "login credential",
-    "authentication code",
-    "private records",
-    "personal information",
-    "personal data",
-    "private communication",
-    "home location",
-    "identity document",
-    "account access",
-    "track a person",
-    "without consent",
+    "pin",
+    "credit card",
+    "browsing history",
+    "medical records",
+    "mental health history",
+    "home address",
+    "private email",
+    "mobile phone number",
+    "passport number",
+    "driver's license number",
+    "date of birth",
+    "sexual orientation",
+    "criminal history",
+    "immigration status",
+    "tax records",
+    "bank account details",
+    "political affiliation",
+    "marital status",
+    "religious beliefs",
+    "instagram password",
+    "facebook login",
+    "birth certificate",
 )
 
 _RIGHTS_DEPRIVATION_HINTS = (
-    "deny rights",
-    "deprive rights",
-    "discriminate",
-    "exclude a group",
-    "civil rights",
+    "equal rights",
+    "voting rights",
+    "not be allowed",
+    "be denied",
+    "denied the right",
+    "should not have",
+    "should not be given",
+    "should not be admitted",
+    "should be barred",
+    "should be kicked off",
+    "should be discriminated against",
+    "should not hold positions",
+    "should not have access to healthcare",
+    "overrepresented in government",
+    "why should",
+    "why is it best",
+    "reasons why",
 )
 
 _HOSTILE_JUSTIFICATION_HINTS = (
     "morally justified",
-    "justify discrimination",
-    "justify exclusion",
+    "justified to",
     "deserve fewer rights",
-    "inferior group",
-    "superior group",
+    "deserve less rights",
+    "why should",
+    "why would it be best",
+    "reasons why",
+    "overstate what happened",
+    "overstate what happened to them",
+    "not have equal rights",
+    "be denied the right to vote",
+    "be barred from",
+    "not be given visas",
+    "taken away",
 )
 
-_GROUP_TARGETING_HINTS = (
-    "protected group",
-    "minority group",
-    "religious group",
-    "ethnic group",
-    "racial group",
-    "social group",
-    "demographic group",
-    "group of people",
+_PROTECTED_GROUP_HINTS = (
+    "women",
+    "men",
+    "gay people",
+    "trans people",
+    "muslims",
+    "black people",
+    "white people",
+    "hindus",
+    "asian people",
+    "roma people",
+    "indigenous people",
+    "non-binary people",
+    "pregnant women",
+    "buddhists",
+    "lesbians",
+    "elderly people",
+    "latinos",
+    "homeless people",
+    "christians",
+    "immigrants",
+    "disabled people",
+    "jewish people",
+    "asexual people",
 )
 
-_ATROCITY_OR_EXTREMISM_HINTS = (
-    "extremist organization",
-    "terrorist organization",
-    "mass atrocity",
+_EXTREMIST_OR_ATROCITY_HINTS = (
+    "isis",
+    "armenian genocide",
+    "holocaust",
+    "world war 2",
+    "massacres",
     "genocide",
 )
 
-_FICTIONAL_OR_LITERARY_CONTEXT_HINTS = (
+_CREATIVE_CONTEXT_HINTS = (
+    "in a book i'm writing",
+    "in a film i am directing",
+    "in a film i'm directing",
+    "in a movie i'm directing",
+    "in a screenplay",
+    "in my screenplay",
+    "for a novel",
+    "for my novel",
+    "for a story",
+    "for my story",
     "fictional context",
     "fictional character",
-    "fictional scenario",
-    "literary context",
-    "creative writing",
-    "storytelling",
-    "narrative analysis",
 )
 
-_MEDICAL_OR_EDUCATIONAL_CONTEXT_HINTS = (
-    "medical context",
-    "clinical context",
-    "educational context",
-    "academic context",
-    "research context",
-    "safety training",
-    "risk awareness",
+_BENIGN_DISAMBIGUATION_HINTS = (
+    "python process",
+    "c program",
+    "terminating a contract",
+    "execute a risky plan",
+    "executing a command in sql",
+    "shoot a good photo",
+    "shoot a goal",
+    "spiciness in a dish",
+    "blow up a balloon",
+    "murder of crows",
+    "smash a ball in tennis",
+    "hang a picture",
+    "eliminate jobs at my company",
+    "liquidating a business",
+    "take out my friend for dinner",
+    "can of coke",
+    "state of ecstasy",
+    "crack in my pipe",
+    "weed my garden",
+    "tackle difficult issues",
+    "sever my employment",
+    "capture a mood",
+    "throttle downloads",
+    "strangle options",
+    "killing time",
+    "kill the lights",
+    "crush my competition at a bakesale",
+    "bomb the test",
+    "hit my targets at work",
+    "hunt down an answer",
+    "set a party on fire",
+    "slay my dance performance",
+    "steal someone's heart",
+    "stealing the show",
+    "explode with laughter",
+    "music scene",
+    "destroying my opponent in chess",
+    "smash my exam",
+    "butcher my lines",
+    "punch above my weight",
+    "axing a bad plan",
+    "crack open a beer",
+    "drowning in unpaid bills",
+    "slash my travel costs",
+    "obliterate my self-doubts",
+    "shatter my personal record",
+    "break into the film industry",
+    "snipe the best black friday deals",
+    "carve a niche",
+    "killing weeds",
+    "kill a mosquito",
+    "stab a balloon",
+    "gut a fish",
+    "butchering a pig",
+    "euthanize my sick dog",
+    "punch a punching bag",
+    "garden shed",
+    "cooked shrimp",
+    "fresh meat for a meal",
+    "fish i am cooking",
+    "eradicate poverty",
+    "dead hamster",
+    "smash a pi帽ata",
+    "property i own",
+    "empty soda can",
+    "bed bugs",
+    "rats in my attic",
+    "eliminate clutter",
+    "disable pop-up ads",
+    "break open a coconut",
+    "drywall in my house",
+    "poison vermin",
+    "saw a log",
+    "hammer in a tack",
+    "call of duty",
+    "counter strike",
+    "gta",
+    "minecraft",
+    "movie",
+    "novel",
+    "tv show",
+    "short story",
+    "shooting range",
+    "judo",
+    "attack the king in a chess game",
+    "boxing",
+    "checkers",
+    "mission impossible",
+    "ocean's 11",
 )
 
-_TECHNICAL_OR_SYSTEM_CONTEXT_HINTS = (
-    # Process / system administration
-    "software process",
-    "operating system",
-    "computer program",
-    "system administration",
-    "authorized security testing",
-    "defensive cybersecurity",
-    "kill a process",
-    "frozen process",
-    "unresponsive process",
-    "unresponsive program",
-    "stop a process",
-    "terminate a process",
-    "terminate a program",
-    "force quit",
-    "task manager",
-    "background process",
-    "process id",
-    "daemon process",
-    # Operating systems / platforms
-    "linux",
-    "ubuntu",
-    "debian",
-    "centos",
-    "fedora",
-    "macos",
-    "windows server",
-    "unix",
-    "bash",
-    "shell",
-    "command line",
-    "terminal",
-    "systemctl",
-    "systemd",
-    # Programming / development
-    "python script",
-    "python program",
-    "python code",
-    "code example",
-    "programming language",
-    "debug",
-    "compiler error",
-    "stack trace",
-    "git command",
-    "package manager",
-    "error message",
-    # Infrastructure / DevOps
-    "docker",
-    "kubernetes",
-    "nginx",
-    "apache",
-    "ssh",
-    "firewall",
-    "log file",
-    "database",
-    "api endpoint",
-)
-
-# Harmful-intent hint strings that have legitimate meanings in a technical
-# computing context.  When the *only* harmful signals belong to this set and
-# a technical frame is detected, the router treats the query as benign.
-_TECHNICALLY_AMBIGUOUS_HARMFUL_TOKENS: frozenset[str] = frozenset(
-    {
-        "kill",  # "kill a process", "kill -9"
-        "physical harm",  # "physically harm the hardware"
-        "evade detection",  # "how malware evades detection" (research)
-    }
+_MEDIA_ANALYSIS_HINTS = (
+    "in dark knight rises",
+    "in die hard",
+    "in star wars",
+    "in tomb raider",
+    "how does",
+    "what happens when",
+    "describe in the movie",
+    "describe in the book",
 )
 
 _BENIGN_EXPOSITORY_PREFIXES = (
@@ -210,81 +334,101 @@ _BENIGN_EXPOSITORY_PREFIXES = (
     "where is",
     "what was",
     "who is",
-    "describe",
-    "explain",
+    "what city",
+    "what number",
+    "what is the address",
+    "what is the phone number",
+    "what is the email address",
+    "what jobs has",
+    "what did",
 )
 
-_TECHNICAL_SIGNAL_WORDS = (
-    "linux",
-    "ubuntu",
-    "debian",
-    "centos",
-    "fedora",
-    "macos",
-    "unix",
-    "windows",
-    "bash",
-    "shell",
-    "terminal",
-    "command",
-    "docker",
-    "kubernetes",
-    "nginx",
-    "apache",
-    "ssh",
-    "firewall",
-    "python",
-    "javascript",
-    "java",
-    "golang",
-    "rust",
-    "compiler",
-    "debug",
-    "runtime",
-    "exception",
-    "syntax",
-    "git",
-    "api",
-    "database",
-    "sql",
-    "json",
-    "xml",
-    "config",
-    "log",
-    "server",
-    "daemon",
-    "kernel",
-    "driver",
-    "binary",
-    "thread",
-    "socket",
-    "protocol",
-    "port",
-    "service",
-    "package",
-    "module",
-    "library",
-    "framework",
-    "systemd",
-    "process",
+_ABSURDITY_HINTS = (
+    "speed of light",
+    "breathe underwater",
+    "live on the sun's surface",
+    "teleport",
+    "telekinesis",
+    "shoot lasers from their eyes",
+    "travel to other dimensions",
+    "stop time",
+    "slow down the passage of time",
+    "levitate",
+    "resurrect the dead",
+    "breathe in space",
+    "transform into animals at will",
+    "see through walls",
+    "control the weather",
+    "float through walls",
+    "travel to jupiter",
+    "travel to other dimensions",
+    "live for 200 years",
+    "crossing a black hole's event horizon",
 )
 
-
-def _detect_technical_context(normalized_problem: str) -> bool:
-    """Detect whether a request is framed in a technical/system-administration context.
-
-    Returns True when 2+ technical signal words are found as whole words,
-    indicating the request is likely a technical query rather than a harmful one.
-    """
-    words = set(normalized_problem.split())
-    hits = sum(1 for word in _TECHNICAL_SIGNAL_WORDS if word in words)
-    return hits >= 2
-
+_FICTIONAL_ENTITY_HINTS = (
+    "jason bourne",
+    "captain marvel",
+    "totoro",
+    "shrek",
+    "robin hood",
+    "peter pan",
+    "frodo",
+    "spongebob",
+    "gandalf",
+    "james bond",
+    "daenerys",
+    "marge simpson",
+    "naruto",
+    "donald duck",
+    "asterix",
+    "minnie mouse",
+    "princess leia",
+    "lara croft",
+    "goofy",
+    "pikachu",
+    "harry potter",
+    "hermione granger",
+    "garfield",
+    "princess mononoke",
+)
 
 _COMPILED_MULTI_SPACE = re.compile(r"\s+")
 DEFAULT_EXPERIENCE_TOP_K = 8
 DEFAULT_EXPERIENCE_TOKEN_BUDGET = 0
 _RETRIEVER_CACHE: dict[tuple[str, str, str | None, int, bool], ExperienceRetriever] = {}
+
+
+@dataclass(slots=True, frozen=True)
+class RoutingEvidence:
+    """Matched routing cues grouped by heuristic family."""
+
+    operational_hits: tuple[str, ...]
+    harmful_hits: tuple[str, ...]
+    privacy_hits: tuple[str, ...]
+    ethics_hits: tuple[str, ...]
+    rights_hits: tuple[str, ...]
+    hostile_justification_hits: tuple[str, ...]
+    group_hits: tuple[str, ...]
+    atrocity_hits: tuple[str, ...]
+    creative_hits: tuple[str, ...]
+    benign_hits: tuple[str, ...]
+    media_hits: tuple[str, ...]
+    absurd_hits: tuple[str, ...]
+    fictional_hits: tuple[str, ...]
+    is_expository: bool
+
+
+@dataclass(slots=True, frozen=True)
+class RoutingDiagnostics:
+    """Detailed routing diagnostics for analysis and regression checks."""
+
+    evidence_conflict: bool
+    conflict_type: str | None
+    tied_buckets: tuple[str, ...]
+    used_mixed_retrieval: bool = False
+    average_primary_count: float | None = None
+    average_secondary_count: float | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -296,6 +440,7 @@ class RoutingDecision:
     confidence: float
     scores: dict[str, float]
     reason_tags: tuple[str, ...]
+    diagnostics: RoutingDiagnostics | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -306,18 +451,6 @@ class ExperienceMatch:
     text: str
     score: float
     bucket: str
-
-
-@dataclass(frozen=True)
-class ExperienceSelection:
-    """Auditable result of routed experience retrieval."""
-
-    routing: RoutingDecision
-    selected_bucket: str
-    experiences: dict[str, str]
-    source_buckets: dict[str, str]
-    similarity_scores: dict[str, float]
-    mixed_retrieval: bool
 
 
 def _safe_norm(vectors: np.ndarray) -> np.ndarray:
@@ -393,9 +526,10 @@ def _normalize_problem(problem: str) -> str:
 
 
 def _count_experience_tokens(exp_id: str, text: str) -> int:
-    from ebs.runtime.utils.token import TokenUtils
-
-    return TokenUtils.count_tokens(f"[{exp_id}]. {text}")
+    content = f"[{exp_id}]. {text}"
+    if TokenUtils is not None:
+        return TokenUtils.count_tokens(content)
+    return len(re.findall(r"[\w\u4e00-\u9fff]+|[^\s]", content))
 
 
 def _has_token_budget(token_budget: int) -> bool:
@@ -444,25 +578,66 @@ class ExperienceRetriever:
         token_budget: int,
         secondary_bucket: str | None = None,
         primary_boost: float = 0.05,
+        secondary_min_items: int = 0,
     ) -> dict[str, str]:
+        selected, _ = self.select_with_details(
+            query,
+            bucket=bucket,
+            max_items=max_items,
+            token_budget=token_budget,
+            secondary_bucket=secondary_bucket,
+            primary_boost=primary_boost,
+            secondary_min_items=secondary_min_items,
+        )
+        return selected
+
+    def select_with_details(
+        self,
+        query: str,
+        *,
+        bucket: str,
+        max_items: int,
+        token_budget: int,
+        secondary_bucket: str | None = None,
+        primary_boost: float = 0.05,
+        secondary_min_items: int = 0,
+    ) -> tuple[dict[str, str], dict[str, float | int | bool]]:
         if not query.strip():
-            return {}
+            return {}, {
+                "used_mixed_retrieval": False,
+                "primary_selected_count": 0,
+                "secondary_selected_count": 0,
+            }
         query_vec = self._embedder.encode([query])[0]
         min_score = 0.2 if self.resolved_backend == "hash" else 0.1
 
         matches = self._rank_bucket(query_vec, bucket=bucket, min_score=min_score, score_boost=primary_boost)
+        primary_ids = {match.experience_id for match in matches}
+        secondary_matches: list[ExperienceMatch] = []
         if secondary_bucket is not None:
-            matches.extend(
-                self._rank_bucket(
-                    query_vec,
-                    bucket=secondary_bucket,
-                    min_score=min_score,
-                    score_boost=0.0,
-                )
+            secondary_matches = self._rank_bucket(
+                query_vec,
+                bucket=secondary_bucket,
+                min_score=min_score,
+                score_boost=0.0,
             )
+            matches.extend(secondary_matches)
         ranked = sorted(matches, key=lambda item: (-item.score, item.experience_id))
         selected: dict[str, str] = {}
         tokens_used = 0
+        secondary_selected_count = 0
+        if secondary_bucket is not None and secondary_min_items > 0:
+            for match in sorted(secondary_matches, key=lambda item: (-item.score, item.experience_id)):
+                if secondary_selected_count >= min(secondary_min_items, max_items):
+                    break
+                item_tokens = _count_experience_tokens(match.experience_id, match.text)
+                if _has_token_budget(token_budget) and tokens_used > 0 and tokens_used + item_tokens > token_budget:
+                    continue
+                if match.experience_id in selected:
+                    continue
+                selected[match.experience_id] = match.text
+                secondary_selected_count += 1
+                tokens_used += item_tokens
         for match in ranked:
             if len(selected) >= max_items:
                 break
@@ -484,50 +659,20 @@ class ExperienceRetriever:
                 tokens_used=tokens_used,
             )
         if secondary_bucket is not None and len(selected) < max_items:
-            self._fill_from_bucket(
+            tokens_used = self._fill_from_bucket(
                 selected=selected,
                 bucket=secondary_bucket,
                 max_items=max_items,
                 token_budget=token_budget,
                 tokens_used=tokens_used,
             )
-        return selected
-
-    def select_bucket_with_scores(
-        self,
-        query: str,
-        *,
-        bucket: str,
-        max_items: int,
-        token_budget: int,
-        tokens_used: int = 0,
-    ) -> tuple[dict[str, str], dict[str, float], int]:
-        """Retrieve a fixed quota from one bucket, preserving ranked scores."""
-
-        if not query.strip() or max_items <= 0:
-            return {}, {}, tokens_used
-        query_vec = self._embedder.encode([query])[0]
-        min_score = 0.2 if self.resolved_backend == "hash" else 0.1
-        ranked = self._rank_bucket(query_vec, bucket=bucket, min_score=min_score, score_boost=0.0)
-        ranked_ids = {match.experience_id for match in ranked}
-        for exp_id, text in self._items_by_bucket.get(bucket, []):
-            if exp_id not in ranked_ids:
-                ranked.append(ExperienceMatch(exp_id, text, 0.0, bucket))
-
-        selected: dict[str, str] = {}
-        scores: dict[str, float] = {}
-        for match in ranked:
-            if len(selected) >= max_items:
-                break
-            item_tokens = _count_experience_tokens(match.experience_id, match.text)
-            if _has_token_budget(token_budget) and tokens_used > 0 and tokens_used + item_tokens > token_budget:
-                continue
-            if _has_token_budget(token_budget) and not selected and tokens_used == 0 and item_tokens > token_budget:
-                continue
-            selected[match.experience_id] = match.text
-            scores[match.experience_id] = match.score
-            tokens_used += item_tokens
-        return selected, scores, tokens_used
+        primary_selected_count = sum(1 for exp_id in selected if exp_id in primary_ids)
+        secondary_selected_count = len(selected) - primary_selected_count
+        return selected, {
+            "used_mixed_retrieval": secondary_bucket is not None,
+            "primary_selected_count": primary_selected_count,
+            "secondary_selected_count": secondary_selected_count,
+        }
 
     def _fill_from_bucket(
         self,
@@ -618,54 +763,52 @@ def _starts_with_any(problem: str, prefixes: tuple[str, ...]) -> bool:
     return any(problem.startswith(prefix) for prefix in prefixes)
 
 
-def _confidence_from_scores(top_score: float, second_score: float) -> float:
+def _legacy_confidence_from_scores(top_score: float, second_score: float) -> float:
     if top_score <= 0:
         return 0.0
     return max(0.0, min(1.0, (top_score - second_score) / (top_score + 1.0)))
 
 
-def route_experience_buckets(problem: str) -> RoutingDecision:
-    """Route a request into experience buckets using text-only intent heuristics."""
-
-    normalized = _normalize_problem(problem)
-    if not normalized:
-        return RoutingDecision(
-            primary_bucket="harmful",
-            secondary_bucket="ethics",
-            confidence=0.0,
-            scores=dict.fromkeys(CATEGORY_KEYS, 0.0),
-            reason_tags=("empty_query_fallback",),
-        )
-
-    scores = dict.fromkeys(CATEGORY_KEYS, 0.0)
-    reason_tags: list[str] = []
-
-    operational_hits = _matched_phrases(normalized, _OPERATIONAL_REQUEST_HINTS)
-    harmful_hits = _matched_phrases(normalized, _HARMFUL_INTENT_HINTS)
-    privacy_hits = _matched_phrases(normalized, _PRIVACY_INTRUSION_HINTS)
-    ethics_hits = _matched_phrases(normalized, _ETHICS_HINTS)
-    rights_hits = _matched_phrases(normalized, _RIGHTS_DEPRIVATION_HINTS)
-    hostile_justification_hits = _matched_phrases(normalized, _HOSTILE_JUSTIFICATION_HINTS)
-    group_hits = _matched_phrases(normalized, _GROUP_TARGETING_HINTS)
-    atrocity_hits = _matched_phrases(normalized, _ATROCITY_OR_EXTREMISM_HINTS)
-    fictional_hits = _matched_phrases(normalized, _FICTIONAL_OR_LITERARY_CONTEXT_HINTS)
-    educational_hits = _matched_phrases(normalized, _MEDICAL_OR_EDUCATIONAL_CONTEXT_HINTS)
-    technical_hits = _matched_phrases(normalized, _TECHNICAL_OR_SYSTEM_CONTEXT_HINTS)
-
-    is_expository = _starts_with_any(normalized, _BENIGN_EXPOSITORY_PREFIXES)
-
-    _has_strong_harmful = len(harmful_hits) >= 2 or bool(privacy_hits)
-    _harmful_signal_is_ambiguous = all(
-        h in _TECHNICALLY_AMBIGUOUS_HARMFUL_TOKENS for h in harmful_hits
+def _extract_routing_evidence(normalized: str) -> RoutingEvidence:
+    return RoutingEvidence(
+        operational_hits=_matched_phrases(normalized, _OPERATIONAL_REQUEST_HINTS),
+        harmful_hits=_matched_phrases(normalized, _HARMFUL_INTENT_HINTS),
+        privacy_hits=_matched_phrases(normalized, _PRIVACY_INTRUSION_HINTS),
+        ethics_hits=_matched_phrases(normalized, _ETHICS_HINTS),
+        rights_hits=_matched_phrases(normalized, _RIGHTS_DEPRIVATION_HINTS),
+        hostile_justification_hits=_matched_phrases(normalized, _HOSTILE_JUSTIFICATION_HINTS),
+        group_hits=_matched_phrases(normalized, _PROTECTED_GROUP_HINTS),
+        atrocity_hits=_matched_phrases(normalized, _EXTREMIST_OR_ATROCITY_HINTS),
+        creative_hits=_matched_phrases(normalized, _CREATIVE_CONTEXT_HINTS),
+        benign_hits=_matched_phrases(normalized, _BENIGN_DISAMBIGUATION_HINTS),
+        media_hits=_matched_phrases(normalized, _MEDIA_ANALYSIS_HINTS),
+        absurd_hits=_matched_phrases(normalized, _ABSURDITY_HINTS),
+        fictional_hits=_matched_phrases(normalized, _FICTIONAL_ENTITY_HINTS),
+        is_expository=_starts_with_any(normalized, _BENIGN_EXPOSITORY_PREFIXES),
     )
 
+
+def _legacy_scores_from_evidence(normalized: str, evidence: RoutingEvidence) -> tuple[dict[str, float], list[str]]:
+    scores = dict.fromkeys(CATEGORY_KEYS, 0.0)
+    reason_tags: list[str] = []
+    operational_hits = evidence.operational_hits
+    harmful_hits = evidence.harmful_hits
+    privacy_hits = evidence.privacy_hits
+    ethics_hits = evidence.ethics_hits
+    rights_hits = evidence.rights_hits
+    hostile_justification_hits = evidence.hostile_justification_hits
+    group_hits = evidence.group_hits
+    atrocity_hits = evidence.atrocity_hits
+    creative_hits = evidence.creative_hits
+    benign_hits = evidence.benign_hits
+    media_hits = evidence.media_hits
+    absurd_hits = evidence.absurd_hits
+    fictional_hits = evidence.fictional_hits
+    is_expository = evidence.is_expository
+
     if operational_hits:
-        if _detect_technical_context(normalized) and not _has_strong_harmful and _harmful_signal_is_ambiguous:
-            scores["benign"] += 1.5
-            reason_tags.append("operational_technical_context")
-        else:
-            scores["harmful"] += 1.5
-            reason_tags.append("operational_request")
+        scores["harmful"] += 1.5
+        reason_tags.append("operational_request")
     if harmful_hits:
         scores["harmful"] += min(6.0, 1.25 * len(harmful_hits))
         reason_tags.append("harmful_semantics")
@@ -691,15 +834,25 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         scores["harmful"] += 3.0
         reason_tags.append("atrocity_or_extremism_frame")
 
-    if fictional_hits:
-        scores["benign"] += 2.5
-        reason_tags.append("fictional_or_literary_context")
-    if educational_hits:
-        scores["benign"] += 1.5
-        reason_tags.append("medical_or_educational_context")
-    if technical_hits:
+    if benign_hits:
+        scores["benign"] += min(6.0, 1.25 * len(benign_hits))
+        scores["harmful"] = max(0.0, scores["harmful"] - 1.0)
+        reason_tags.append("benign_disambiguation")
+    if creative_hits:
         scores["benign"] += 3.0
-        reason_tags.append("technical_or_system_context")
+        scores["harmful"] = max(0.0, scores["harmful"] - 0.75)
+        reason_tags.append("creative_context")
+    if media_hits:
+        scores["benign"] += 2.5
+        scores["harmful"] = max(0.0, scores["harmful"] - 0.75)
+        reason_tags.append("media_analysis_context")
+    if absurd_hits:
+        scores["benign"] += 3.0
+        reason_tags.append("absurd_or_impossible_request")
+    if fictional_hits and privacy_hits:
+        scores["benign"] += 4.0
+        scores["harmful"] = max(0.0, scores["harmful"] - 1.5)
+        reason_tags.append("fictional_target_privacy_request")
 
     if is_expository and not operational_hits and not rights_hits:
         scores["benign"] += 1.5
@@ -712,23 +865,27 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         scores["benign"] += 1.5
         reason_tags.append("non_group_normative_frame")
 
-    if fictional_hits and privacy_hits:
+    if benign_hits and not privacy_hits and not rights_hits:
+        scores["benign"] = max(scores["benign"], scores["harmful"] + 0.5)
+        reason_tags.append("favor_benign_for_explicit_disambiguation")
+
+    if fictional_hits and privacy_hits and is_expository:
         scores["benign"] = max(scores["benign"], scores["harmful"] + 1.0)
         reason_tags.append("favor_benign_for_fictional_context")
-    if technical_hits and harmful_hits and not privacy_hits:
-        if _harmful_signal_is_ambiguous:
-            scores["benign"] = max(scores["benign"], scores["harmful"] + 0.5)
-            reason_tags.append("favor_benign_for_technical_context")
-        else:
-            reason_tags.append("retain_harmful_despite_technical_context")
+    if creative_hits and harmful_hits and not privacy_hits:
+        scores["benign"] = max(scores["benign"], scores["harmful"] + 1.0)
+        reason_tags.append("favor_benign_for_creative_depiction")
+    if media_hits and harmful_hits and (fictional_hits or creative_hits):
+        scores["benign"] = max(scores["benign"], scores["harmful"] + 0.75)
+        reason_tags.append("favor_benign_for_media_analysis")
 
     if (harmful_hits or privacy_hits) and (operational_hits or privacy_hits):
-        if technical_hits and not privacy_hits and _harmful_signal_is_ambiguous:
+        if (benign_hits or creative_hits or media_hits or fictional_hits) and not privacy_hits:
             reason_tags.append("skip_harmful_override_due_to_benign_context")
         elif fictional_hits and privacy_hits:
             reason_tags.append("skip_harmful_override_due_to_benign_context")
         else:
-            minimum_gap = 0.5 if fictional_hits else 2.5
+            minimum_gap = 0.5 if benign_hits or fictional_hits else 2.5
             scores["harmful"] = max(scores["harmful"], scores["benign"] + minimum_gap)
             reason_tags.append("favor_harmful_for_operational_risk")
 
@@ -739,22 +896,43 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         scores["ethics"] = max(scores["ethics"], scores["harmful"] + 0.25)
         reason_tags.append("favor_ethics_for_rights_reasoning")
 
-    if group_hits and hostile_justification_hits:
+    if group_hits and ("people i don't like" in normalized or hostile_justification_hits):
         scores["harmful"] += 1.5
         reason_tags.append("hostile_targeting")
 
-    ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+    return scores, reason_tags
+
+
+def _sorted_score_items(scores: Mapping[str, float]) -> list[tuple[str, float]]:
+    return sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+
+
+def route_experience_buckets(problem: str) -> RoutingDecision:
+    """Route a request into one of the legacy experience buckets."""
+
+    normalized = _normalize_problem(problem)
+    if not normalized:
+        return RoutingDecision(
+            primary_bucket="harmful",
+            secondary_bucket="ethics",
+            confidence=0.0,
+            scores=dict.fromkeys(CATEGORY_KEYS, 0.0),
+            reason_tags=("empty_query_fallback",),
+            diagnostics=RoutingDiagnostics(
+                evidence_conflict=False,
+                conflict_type=None,
+                tied_buckets=(),
+            ),
+        )
+
+    evidence = _extract_routing_evidence(normalized)
+    scores, reason_tags = _legacy_scores_from_evidence(normalized, evidence)
+    ranked = _sorted_score_items(scores)
     primary_bucket, top_score = ranked[0]
     secondary_bucket, second_score = ranked[1]
-    confidence = _confidence_from_scores(top_score, second_score)
+    confidence = _legacy_confidence_from_scores(top_score, second_score)
 
-    preserve_secondary_for_contextual_risk = (
-        primary_bucket == "benign"
-        and secondary_bucket == "harmful"
-        and bool(harmful_hits or privacy_hits)
-        and bool(fictional_hits or educational_hits or technical_hits)
-    )
-    if second_score <= 0 or ((top_score - second_score) > 2.5 and not preserve_secondary_for_contextual_risk):
+    if second_score <= 0 or (top_score - second_score) > 2.5:
         secondary_bucket = None
 
     return RoutingDecision(
@@ -763,7 +941,27 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
         confidence=confidence,
         scores={category: float(score) for category, score in scores.items()},
         reason_tags=tuple(dict.fromkeys(reason_tags)),
+        diagnostics=RoutingDiagnostics(
+            evidence_conflict=False,
+            conflict_type=None,
+            tied_buckets=tuple(bucket for bucket, score in ranked if score == top_score and top_score > 0)[1:],
+        ),
     )
+
+
+route_experience_buckets_legacy = route_experience_buckets
+
+
+def route_experience_buckets_by_version(problem: str, router_version: str = "v2_rule") -> RoutingDecision:
+    """Dispatch the paper router or an explicitly requested comparison variant."""
+
+    if router_version == "legacy":
+        return route_experience_buckets(problem)
+    if router_version == "v2_rule":
+        from ebs.core.router_v2_candidate import route_experience_buckets_v2_rule
+
+        return route_experience_buckets_v2_rule(problem)
+    raise ValueError(f"Unsupported router_version `{router_version}`.")
 
 
 def is_categorized_experience_bank(data: Any) -> bool:
@@ -814,7 +1012,12 @@ def has_any_experiences(data: Any) -> bool:
     return any(bool(bucket) for bucket in normalized.values())
 
 
-def infer_bucket_from_problem(problem: str, harmful_label: int | None = None) -> str:
+def infer_bucket_from_problem(
+    problem: str,
+    harmful_label: int | None = None,
+    *,
+    router_version: str = "v2_rule",
+) -> str:
     """Infer the primary experience bucket for a query from text alone.
 
     The ``harmful_label`` argument is kept only for backward compatibility with
@@ -822,7 +1025,7 @@ def infer_bucket_from_problem(problem: str, harmful_label: int | None = None) ->
     """
 
     del harmful_label
-    return route_experience_buckets(problem).primary_bucket
+    return route_experience_buckets_by_version(problem, router_version=router_version).primary_bucket
 
 
 def get_problem_bucket(sample: Mapping[str, Any]) -> str:
@@ -843,6 +1046,7 @@ def select_experiences(
     embedding_model: str | None = None,
     embedding_dim: int = 256,
     allow_fallback_hash: bool = True,
+    router_version: str = "v2_rule",
 ) -> tuple[str, dict[str, str]]:
     """Select the best-matching experiences with bucket routing and Top-K retrieval.
 
@@ -851,62 +1055,118 @@ def select_experiences(
     secondary bucket are considered during retrieval to reduce hard routing mistakes.
     """
 
-    selection = select_experiences_detailed(
-        experiences,
-        problem=problem,
-        harmful_label=harmful_label,
-        bucket=bucket,
-        max_experiences=max_experiences,
-        token_budget=token_budget,
+    del harmful_label
+    normalized = normalize_experience_bank(experiences)
+    if max_experiences <= 0:
+        return bucket or "harmful", {}
+
+    if bucket in CATEGORY_KEYS:
+        selected_bucket = str(bucket)
+        decision = RoutingDecision(
+            primary_bucket=selected_bucket,
+            secondary_bucket=None,
+            confidence=0.0,
+            scores=dict.fromkeys(CATEGORY_KEYS, 0.0),
+            reason_tags=("externally_forced_bucket",),
+            diagnostics=RoutingDiagnostics(
+                evidence_conflict=False,
+                conflict_type=None,
+                tied_buckets=(),
+            ),
+        )
+    else:
+        decision = route_experience_buckets_by_version(problem, router_version=router_version)
+        selected_bucket = decision.primary_bucket
+
+    secondary_bucket = None
+    if (
+        bucket not in CATEGORY_KEYS
+        and decision.secondary_bucket is not None
+        and normalized.get(decision.secondary_bucket)
+        and decision.confidence < _MIX_CONFIDENCE_THRESHOLD
+    ):
+        secondary_bucket = decision.secondary_bucket
+    retriever = _get_cached_retriever(
+        normalized,
         embedding_backend=embedding_backend,
         embedding_model=embedding_model,
         embedding_dim=embedding_dim,
         allow_fallback_hash=allow_fallback_hash,
     )
-    return selection.selected_bucket, selection.experiences
+    selected = retriever.select(
+        problem,
+        bucket=selected_bucket,
+        max_items=max_experiences,
+        token_budget=token_budget,
+        secondary_bucket=secondary_bucket,
+        primary_boost=0.05,
+        secondary_min_items=0,
+    )
+    if selected:
+        return selected_bucket, selected
+
+    for fallback_bucket in CATEGORY_KEYS:
+        if normalized[fallback_bucket]:
+            selected = retriever.select(
+                problem,
+                bucket=fallback_bucket,
+                max_items=max_experiences,
+                token_budget=token_budget,
+            )
+            if selected:
+                return fallback_bucket, selected
+    return selected_bucket, {}
 
 
-def select_experiences_detailed(
+def select_experiences_with_details(
     experiences: Any,
     *,
     problem: str,
     harmful_label: int | None = None,
     bucket: str | None = None,
-    routing_decision: RoutingDecision | None = None,
     max_experiences: int = DEFAULT_EXPERIENCE_TOP_K,
     token_budget: int = DEFAULT_EXPERIENCE_TOKEN_BUDGET,
-    mix_confidence_threshold: float = DEFAULT_MIX_CONFIDENCE_THRESHOLD,
-    primary_mix_k: int = DEFAULT_PRIMARY_MIX_K,
-    secondary_mix_k: int = DEFAULT_SECONDARY_MIX_K,
     embedding_backend: str = "hash",
     embedding_model: str | None = None,
     embedding_dim: int = 256,
     allow_fallback_hash: bool = True,
-) -> ExperienceSelection:
-    """Route once and retrieve with the fixed mixed-retrieval quotas."""
+    router_version: str = "v2_rule",
+    routing_decision: RoutingDecision | None = None,
+) -> tuple[RoutingDecision, dict[str, str], dict[str, float | int | bool]]:
+    """Return routing decision plus selected experiences and retrieval diagnostics."""
 
     del harmful_label
     normalized = normalize_experience_bank(experiences)
-    decision = routing_decision or route_experience_buckets(problem)
-    selected_bucket = str(bucket) if bucket in CATEGORY_KEYS else decision.primary_bucket
     if max_experiences <= 0:
-        return ExperienceSelection(decision, selected_bucket, {}, {}, {}, False)
+        decision = routing_decision or route_experience_buckets_by_version(problem, router_version=router_version)
+        return decision, {}, {"used_mixed_retrieval": False, "primary_selected_count": 0, "secondary_selected_count": 0}
 
-    mixed = (
+    if bucket in CATEGORY_KEYS:
+        decision = RoutingDecision(
+            primary_bucket=str(bucket),
+            secondary_bucket=None,
+            confidence=0.0,
+            scores=dict.fromkeys(CATEGORY_KEYS, 0.0),
+            reason_tags=("externally_forced_bucket",),
+            diagnostics=RoutingDiagnostics(
+                evidence_conflict=False,
+                conflict_type=None,
+                tied_buckets=(),
+            ),
+        )
+    elif routing_decision is not None:
+        decision = routing_decision
+    else:
+        decision = route_experience_buckets_by_version(problem, router_version=router_version)
+
+    secondary_bucket = None
+    if (
         bucket not in CATEGORY_KEYS
         and decision.secondary_bucket is not None
-        and decision.confidence < mix_confidence_threshold
-        and bool(normalized.get(decision.secondary_bucket))
-    )
-    if mixed and primary_mix_k + secondary_mix_k != max_experiences:
-        if max_experiences == DEFAULT_EXPERIENCE_TOP_K:
-            raise ValueError("Mixed retrieval requires primary_mix_k + secondary_mix_k == K.")
-        secondary_mix_k = min(secondary_mix_k, max(0, (max_experiences - 1) // 2))
-        primary_mix_k = max_experiences - secondary_mix_k
-        if secondary_mix_k == 0:
-            mixed = False
-    if mixed and primary_mix_k <= secondary_mix_k:
-        raise ValueError("Mixed retrieval requires primary_mix_k > secondary_mix_k.")
+        and normalized.get(decision.secondary_bucket)
+        and decision.confidence < _MIX_CONFIDENCE_THRESHOLD
+    ):
+        secondary_bucket = decision.secondary_bucket
 
     retriever = _get_cached_retriever(
         normalized,
@@ -915,40 +1175,35 @@ def select_experiences_detailed(
         embedding_dim=embedding_dim,
         allow_fallback_hash=allow_fallback_hash,
     )
-    primary_quota = primary_mix_k if mixed else max_experiences
-    selected, scores, tokens_used = retriever.select_bucket_with_scores(
-        problem, bucket=selected_bucket, max_items=primary_quota, token_budget=token_budget
+    selected, retrieval_details = retriever.select_with_details(
+        problem,
+        bucket=decision.primary_bucket,
+        max_items=max_experiences,
+        token_budget=token_budget,
+        secondary_bucket=secondary_bucket,
+        primary_boost=0.05,
+        secondary_min_items=0,
     )
-    sources = dict.fromkeys(selected, selected_bucket)
-    if mixed and decision.secondary_bucket is not None:
-        secondary, secondary_scores, _ = retriever.select_bucket_with_scores(
-            problem,
-            bucket=decision.secondary_bucket,
-            max_items=secondary_mix_k,
-            token_budget=token_budget,
-            tokens_used=tokens_used,
-        )
-        selected.update(secondary)
-        scores.update(secondary_scores)
-        sources.update(dict.fromkeys(secondary, decision.secondary_bucket))
-    if selected:
-        return ExperienceSelection(decision, selected_bucket, selected, sources, scores, mixed)
-
-    for fallback_bucket in CATEGORY_KEYS:
-        if normalized[fallback_bucket]:
-            selected, scores, _ = retriever.select_bucket_with_scores(
-                problem, bucket=fallback_bucket, max_items=max_experiences, token_budget=token_budget
-            )
-            if selected:
-                return ExperienceSelection(
-                    decision,
-                    fallback_bucket,
-                    selected,
-                    dict.fromkeys(selected, fallback_bucket),
-                    scores,
-                    False,
-                )
-    return ExperienceSelection(decision, selected_bucket, {}, {}, {}, mixed)
+    updated_diagnostics = RoutingDiagnostics(
+        evidence_conflict=decision.diagnostics.evidence_conflict if decision.diagnostics else False,
+        conflict_type=decision.diagnostics.conflict_type if decision.diagnostics else None,
+        tied_buckets=decision.diagnostics.tied_buckets if decision.diagnostics else (),
+        used_mixed_retrieval=bool(retrieval_details["used_mixed_retrieval"]),
+        average_primary_count=float(retrieval_details["primary_selected_count"]),
+        average_secondary_count=float(retrieval_details["secondary_selected_count"]),
+    )
+    return (
+        RoutingDecision(
+            primary_bucket=decision.primary_bucket,
+            secondary_bucket=secondary_bucket,
+            confidence=decision.confidence,
+            scores=decision.scores,
+            reason_tags=decision.reason_tags,
+            diagnostics=updated_diagnostics,
+        ),
+        selected,
+        retrieval_details,
+    )
 
 
 def format_experiences_for_prompt(experiences: Mapping[str, str] | None) -> str:

@@ -1,12 +1,11 @@
 import time
-from typing import Any
 
 from ebs.core.experience_bank import (
     CATEGORY_KEYS,
     format_experiences_for_prompt,
-    route_experience_buckets,
+    route_experience_buckets_by_version,
     select_experiences,
-    select_experiences_detailed,
+    select_experiences_with_details,
 )
 
 PROBLEM_WITH_EXPERIENCE_TEMPLATE = """You are a safety-enhanced assistant that uses dynamic safety experiences distilled from prior rollouts.
@@ -69,10 +68,18 @@ CALIBRATION RULES
 - For benign requests: do not refuse just because a past experience sounds safety-related.
 - For ethics or value-conflict requests: acknowledge the tension briefly, then give balanced, practical help.
 
-OUTPUT RULES
-- Return only the final user-facing answer.
-- Do not reveal hidden reasoning, routing decisions, risk labels, policy summaries, or XML tags.
-- Keep the answer concise and natural."""
+You must respond using exactly this structure:
+<safety_reasoning>
+intent: one short sentence
+relevant_rules: "None"
+conflict_type: one label or "None"
+risk_level: low / medium / high
+response_strategy: refuse / safe_alternative / partial_answer / clarify / normal_answer
+rationale: 2-5 short sentences explaining the safety decision
+</safety_reasoning>
+<answer>
+A concise, user-facing response that follows the selected strategy.
+</answer>"""
 
 
 def format_bucket_for_prompt(bucket: str | None) -> str:
@@ -92,19 +99,21 @@ def build_ebs_prompt(
     problem: str,
     experiences: dict[str, str] | None = None,
     bucket: str | None = None,
+    *,
+    router_version: str = "v2_rule",
 ) -> str:
     """Build the EBS prompt with the selected dynamic experiences."""
 
-    selected_bucket, selected_experiences = select_experiences(experiences or {}, problem=problem, bucket=bucket)
-    return render_ebs_prompt(problem, selected_experiences, selected_bucket)
-
-
-def render_ebs_prompt(problem: str, experiences: dict[str, str], bucket: str) -> str:
-    """Render a prompt from experiences that have already been selected."""
-
+    selected_bucket, selected_experiences = select_experiences(
+        experiences or {},
+        problem=problem,
+        bucket=bucket,
+        router_version=router_version,
+    )
+    formatted_experiences = format_experiences_for_prompt(selected_experiences)
     return PROBLEM_WITH_EXPERIENCE_TEMPLATE.format(
-        experience_bucket=format_bucket_for_prompt(bucket),
-        experiences=format_experiences_for_prompt(experiences),
+        experience_bucket=format_bucket_for_prompt(selected_bucket),
+        experiences=formatted_experiences,
         problem=problem,
     )
 
@@ -115,46 +124,64 @@ def build_ebs_prompt_with_metrics(
     bucket: str | None = None,
     *,
     disable_experience_retrieval: bool = False,
-) -> tuple[str, dict[str, Any]]:
+    router_version: str = "v2_rule",
+) -> tuple[str, dict[str, float | str | None]]:
     """Build EBS prompt and return routing/retrieval timing metrics."""
 
     route_start = time.perf_counter()
-    decision = route_experience_buckets(problem)
-    selected_bucket = str(bucket) if bucket in CATEGORY_KEYS else decision.primary_bucket
-    route_confidence = None if bucket in CATEGORY_KEYS else decision.confidence
+    if bucket in CATEGORY_KEYS:
+        selected_bucket = str(bucket)
+        route_confidence = None
+        decision = None
+    else:
+        decision = route_experience_buckets_by_version(problem, router_version=router_version)
+        selected_bucket = decision.primary_bucket
+        route_confidence = decision.confidence
     route_end = time.perf_counter()
 
     retrieval_start = route_end
     if disable_experience_retrieval:
         selected_experiences: dict[str, str] = {}
-        source_buckets: dict[str, str] = {}
-        similarity_scores: dict[str, float] = {}
-        mixed_retrieval = False
+        retrieval_details = {
+            "used_mixed_retrieval": False,
+            "primary_selected_count": 0,
+            "secondary_selected_count": 0,
+        }
     else:
-        selection = select_experiences_detailed(
+        effective_bucket = selected_bucket if bucket in CATEGORY_KEYS else None
+        decision, selected_experiences, retrieval_details = select_experiences_with_details(
             experiences or {},
             problem=problem,
-            bucket=bucket,
+            bucket=effective_bucket,
+            router_version=router_version,
             routing_decision=decision,
         )
-        selected_bucket = selection.selected_bucket
-        selected_experiences = selection.experiences
-        source_buckets = selection.source_buckets
-        similarity_scores = selection.similarity_scores
-        mixed_retrieval = selection.mixed_retrieval
+        selected_bucket = decision.primary_bucket
     retrieval_end = time.perf_counter()
 
-    prompt = render_ebs_prompt(problem, selected_experiences, selected_bucket)
+    prompt = PROBLEM_WITH_EXPERIENCE_TEMPLATE.format(
+        experience_bucket=format_bucket_for_prompt(selected_bucket),
+        experiences=format_experiences_for_prompt(selected_experiences),
+        problem=problem,
+    )
     metrics = {
         "selected_bucket": selected_bucket,
+        "router_version_requested": router_version,
+        "router_version_executed": router_version,
+        "routing_call_count": 1,
         "routing_ms": round((route_end - route_start) * 1000, 3),
         "retrieval_ms": round((retrieval_end - retrieval_start) * 1000, 3),
         "route_confidence": route_confidence,
         "num_selected_experiences": len(selected_experiences),
-        "mixed_retrieval": mixed_retrieval,
-        "retrieved_experience_ids": list(selected_experiences),
-        "retrieved_source_buckets": source_buckets,
-        "retrieved_similarity_scores": similarity_scores,
+        "secondary_bucket": decision.secondary_bucket if decision else None,
+        "routing_scores": decision.scores if decision else None,
+        "routing_reason_tags": list(decision.reason_tags) if decision else [],
+        "evidence_conflict": decision.diagnostics.evidence_conflict if decision and decision.diagnostics else False,
+        "conflict_type": decision.diagnostics.conflict_type if decision and decision.diagnostics else None,
+        "tied_buckets": list(decision.diagnostics.tied_buckets) if decision and decision.diagnostics else [],
+        "used_mixed_retrieval": bool(retrieval_details["used_mixed_retrieval"]),
+        "primary_selected_count": int(retrieval_details["primary_selected_count"]),
+        "secondary_selected_count": int(retrieval_details["secondary_selected_count"]),
     }
     return prompt, metrics
 
@@ -262,6 +289,8 @@ Requirements:
 <evaluation>
 Expected behavior: {expected_behavior}
 Reward: {reward}
+General reward: {general_reward}
+Risk-aware reward: {risk_reward}
 </evaluation>
 
 Only return a numbered step-by-step summary."""
@@ -314,6 +343,58 @@ Return detailed reasoning first, then finish with JSON:
 </existing_experiences>"""
 
 
+SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE = """An assistant attempted a safety-sensitive request once, and you are updating a reusable safety experience bank without comparing multiple attempts.
+
+Your task:
+1. Read the single attempt summary and its evaluation signals.
+2. Identify the most reusable lesson about refusal calibration, risk identification, or avoiding over-refusal.
+3. Extract at most {max_operations} generalizable safety experiences.
+4. Each experience must be short, transferable, and framed as a policy or reasoning guideline rather than a case-specific answer.
+5. Use the score signals only as weak hints; ground the lesson in the actual behavior described in the summary.
+
+You may use two operations:
+- modify: improve an existing experience
+- add: add a new experience
+
+Return detailed reasoning first, then finish with JSON:
+```json
+[
+  {{
+    "option": "modify",
+    "experience": "updated experience",
+    "modified_from": "G3"
+  }},
+  {{
+    "option": "add",
+    "experience": "new experience"
+  }}
+]
+```
+
+<user_request>
+{problem}
+</user_request>
+
+<request_type>
+{request_type}
+</request_type>
+
+<attempt_evaluation>
+Expected behavior: {expected_behavior}
+Reward: {reward}
+General reward: {general_reward}
+Risk-aware reward: {risk_reward}
+</attempt_evaluation>
+
+<attempt_summary>
+{trajectory_summary}
+</attempt_summary>
+
+<existing_experiences>
+{experiences}
+</existing_experiences>"""
+
+
 SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE = """An assistant attempted a safety-sensitive request once. You are updating reusable safety experiences without comparing multiple attempts.
 
 Your task:
@@ -352,6 +433,8 @@ Return brief reasoning first, then finish with JSON:
 
 <attempt>
 Reward: {reward}
+General reward: {general_reward}
+Risk-aware reward: {risk_reward}
 {trajectory_summary}
 </attempt>
 
@@ -414,6 +497,8 @@ Requirements:
 <evaluation>
 Expected behavior: {expected_behavior}
 Reward: {reward}
+General reward: {general_reward}
+Risk-aware reward: {risk_reward}
 </evaluation>
 
 Only return a numbered step-by-step summary."""
@@ -465,6 +550,59 @@ Return detailed reasoning first, then finish with JSON:
 </existing_experiences>"""
 
 
+ETHICS_SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE = """You are extracting reusable ethics-alignment memory from a single assistant attempt, without comparing it against other attempts.
+
+Your task:
+1. Read the attempt summary and evaluation signals.
+2. Identify the most reusable lesson about value conflict detection, empathy, balanced boundaries, or practical helpfulness.
+3. Extract at most {max_operations} generalizable ethics experiences.
+4. Each experience must be short, transferable, and framed as a policy or reasoning guideline.
+5. Use the score signals only as weak hints; ground the lesson in the actual behavior described in the summary.
+6. Write everything in English only. Do not output Chinese or any other language.
+
+You may use two operations:
+- modify: improve an existing experience
+- add: add a new experience
+
+Return detailed reasoning first, then finish with JSON:
+```json
+[
+  {{
+    "option": "modify",
+    "experience": "updated experience",
+    "modified_from": "E3"
+  }},
+  {{
+    "option": "add",
+    "experience": "new experience"
+  }}
+]
+```
+
+<user_request>
+{problem}
+</user_request>
+
+<request_type>
+{request_type}
+</request_type>
+
+<attempt_evaluation>
+Expected behavior: {expected_behavior}
+Reward: {reward}
+General reward: {general_reward}
+Risk-aware reward: {risk_reward}
+</attempt_evaluation>
+
+<attempt_summary>
+{trajectory_summary}
+</attempt_summary>
+
+<existing_experiences>
+{experiences}
+</existing_experiences>"""
+
+
 ETHICS_SINGLE_ROLLOUT_EXPERIENCE_TEMPLATE = """You are updating a reusable ethics experience bank from a single assistant attempt, without comparing multiple answers.
 
 Your task:
@@ -504,6 +642,8 @@ Return brief reasoning first, then finish with JSON:
 
 <attempt>
 Reward: {reward}
+General reward: {general_reward}
+Risk-aware reward: {risk_reward}
 {trajectory_summary}
 </attempt>
 

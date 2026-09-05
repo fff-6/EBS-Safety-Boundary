@@ -4,7 +4,7 @@ This entry point intentionally reuses the RedEval RedBench workflow from
 ``eval_ebs_redbench.py`` while fixing the main-experiment surface to:
 
 - HarmBench harmful prompts with direct attack only
-- XSTest prompts through the same generation path used by other direct evaluations
+- XSTest benign prompts with the base refusal-evaluation wrapper
 - HarmBench ASR and XSTest boundary-calibration metrics
 """
 
@@ -42,7 +42,6 @@ DEFAULT_OUTPUT_DIR = os.path.join("data", "ebs", "eval", "main_experiment")
 DEFAULT_HARMBENCH_LIMIT = 320
 DEFAULT_EXPERIENCE_TOP_K = _HELPERS.DEFAULT_EXPERIENCE_TOP_K
 DEFAULT_EXPERIENCE_TOKEN_BUDGET = _HELPERS.DEFAULT_EXPERIENCE_TOKEN_BUDGET
-EBS_XSTEST_SEEDS = (42, 43, 44, 45, 46)
 
 
 def calculate_balance_score(harmbench_asr: float, xstest_over_refusal: float) -> float:
@@ -234,6 +233,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--experience_file", type=str, default=None, help="Optional generated EBS experience JSON.")
     parser.add_argument(
+        "--router_version",
+        type=str,
+        default="v2_rule",
+        choices=["legacy", "v2_rule"],
+        help="Router implementation used for every EBS routing call.",
+    )
+    parser.add_argument(
         "--experience_top_k",
         type=int,
         default=DEFAULT_EXPERIENCE_TOP_K,
@@ -275,16 +281,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target_base_url", type=str, default=None, help="Target model base URL override.")
     parser.add_argument("--target_api_key", type=str, default=None, help="Target model API key override.")
     parser.add_argument("--target_temperature", type=float, default=0.6, help="Target model temperature.")
+    parser.add_argument("--seed", type=int, default=42, help="Generation and judge seed.")
     parser.add_argument("--target_top_p", type=float, default=0.9, help="Target model top-p.")
     parser.add_argument("--target_max_tokens", type=int, default=256, help="Target model max output tokens.")
     parser.add_argument("--target_max_model_len", type=int, default=4096, help="vLLM max_model_len.")
     parser.add_argument("--target_gpu_memory_utilization", type=float, default=0.8, help="vLLM GPU utilization.")
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=EBS_XSTEST_SEEDS[0],
-        help="Generation seed. Full XSTest runs use 42,43,44,45,46.",
-    )
     parser.add_argument("--judge_provider", type=str, default=None, choices=["openai", "vllm", "local_transformers"])
     parser.add_argument("--judge_model", type=str, default=None, help="Override both attack/refuse judge models.")
     parser.add_argument("--judge_base_url", type=str, default=None, help="Judge model base URL override.")
@@ -363,7 +364,6 @@ def main() -> None:
             else None
         ),
         request_interval_seconds=float(default_target_mapping.get("request_interval_seconds", 0.0)),
-        seed=args.seed,
     )
     if not target_model.provider:
         raise ValueError(f"Target provider is not configured. Update {args.config_path} or pass --target_provider.")
@@ -424,6 +424,10 @@ def main() -> None:
     )
     if judge_model is None or attack_judge_model is None or refuse_judge_model is None:
         raise ValueError(f"Judge model is not configured. Update {args.config_path} or pass judge overrides.")
+    target_model.seed = args.seed
+    judge_model.seed = args.seed
+    attack_judge_model.seed = args.seed
+    refuse_judge_model.seed = args.seed
 
     benchmark_limits = _resolve_main_benchmark_limits(args)
     benchmarks, harmful_benchmarks, benign_benchmarks, xstest_official, mode_subdir = _resolve_run_scope(args.run_mode)
@@ -454,6 +458,7 @@ def main() -> None:
             experience_token_budget=args.experience_token_budget,
             attack_methods=MAIN_ATTACK_METHODS,
             xstest_official=xstest_official,
+            router_version=args.router_version,
         )
     )
     metrics = save_main_metric_outputs(summary, effective_output_dir, args.experiment_name)
