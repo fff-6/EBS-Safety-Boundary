@@ -16,7 +16,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from ebs.core.experience_bank import normalize_experience_bank  # noqa: E402
+from ebs.core.experience_bank import normalize_experience_bank, normalize_router_mode  # noqa: E402
 from ebs.llm import LLM  # noqa: E402
 from ebs.runtime.agents import SimpleAgent  # noqa: E402
 from ebs.runtime.agents.common import TaskRecorder  # noqa: E402
@@ -342,7 +342,7 @@ async def main(args):
                 each["problem"],
                 experiences=experiences,
                 disable_experience_retrieval=args.disable_experience_retrieval,
-                router_version=args.router_version,
+                router_mode=args.router_mode,
             )
             formatted_test_data.append(
                 {
@@ -404,11 +404,19 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_truncate", type=int, default=None, help="Truncate dataset to first N samples")
     parser.add_argument("--experience_file", type=str, default=None)
     parser.add_argument(
+        "--router",
+        dest="router_mode",
+        type=normalize_router_mode,
+        default="rule",
+        choices=["rule", "legacy"],
+        help="Router mode: rule (default EBS router) or legacy (controlled comparisons).",
+    )
+    parser.add_argument(
         "--router_version",
-        type=str,
-        default="v2_rule",
-        choices=["legacy", "v2_rule"],
-        help="Experience router version. The final EBS v2 router is the default.",
+        dest="router_mode",
+        type=normalize_router_mode,
+        choices=["rule", "legacy"],
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--skip_verify", action="store_true", help="Skip judge-model verification to measure raw inference cost only."

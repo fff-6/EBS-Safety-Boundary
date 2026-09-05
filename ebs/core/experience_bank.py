@@ -952,16 +952,25 @@ def route_experience_buckets(problem: str) -> RoutingDecision:
 route_experience_buckets_legacy = route_experience_buckets
 
 
-def route_experience_buckets_by_version(problem: str, router_version: str = "v2_rule") -> RoutingDecision:
-    """Dispatch the paper router or an explicitly requested comparison variant."""
+def normalize_router_mode(router_mode: str) -> str:
+    """Normalize the public router name and its deprecated compatibility alias."""
 
-    if router_version == "legacy":
+    if router_mode == "v2_rule":
+        return "rule"
+    return router_mode
+
+
+def route_experience_buckets_by_mode(problem: str, router_mode: str = "rule") -> RoutingDecision:
+    """Dispatch the default EBS router or the legacy comparison implementation."""
+
+    router_mode = normalize_router_mode(router_mode)
+    if router_mode == "legacy":
         return route_experience_buckets(problem)
-    if router_version == "v2_rule":
-        from ebs.core.router_v2_candidate import route_experience_buckets_v2_rule
+    if router_mode == "rule":
+        from ebs.core.router import route_experience_buckets_rule
 
-        return route_experience_buckets_v2_rule(problem)
-    raise ValueError(f"Unsupported router_version `{router_version}`.")
+        return route_experience_buckets_rule(problem)
+    raise ValueError(f"Unsupported router_mode `{router_mode}`.")
 
 
 def is_categorized_experience_bank(data: Any) -> bool:
@@ -1016,7 +1025,7 @@ def infer_bucket_from_problem(
     problem: str,
     harmful_label: int | None = None,
     *,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
 ) -> str:
     """Infer the primary experience bucket for a query from text alone.
 
@@ -1025,7 +1034,7 @@ def infer_bucket_from_problem(
     """
 
     del harmful_label
-    return route_experience_buckets_by_version(problem, router_version=router_version).primary_bucket
+    return route_experience_buckets_by_mode(problem, router_mode=router_mode).primary_bucket
 
 
 def get_problem_bucket(sample: Mapping[str, Any]) -> str:
@@ -1046,7 +1055,7 @@ def select_experiences(
     embedding_model: str | None = None,
     embedding_dim: int = 256,
     allow_fallback_hash: bool = True,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
 ) -> tuple[str, dict[str, str]]:
     """Select the best-matching experiences with bucket routing and Top-K retrieval.
 
@@ -1075,7 +1084,7 @@ def select_experiences(
             ),
         )
     else:
-        decision = route_experience_buckets_by_version(problem, router_version=router_version)
+        decision = route_experience_buckets_by_mode(problem, router_mode=router_mode)
         selected_bucket = decision.primary_bucket
 
     secondary_bucket = None
@@ -1130,7 +1139,7 @@ def select_experiences_with_details(
     embedding_model: str | None = None,
     embedding_dim: int = 256,
     allow_fallback_hash: bool = True,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
     routing_decision: RoutingDecision | None = None,
 ) -> tuple[RoutingDecision, dict[str, str], dict[str, float | int | bool]]:
     """Return routing decision plus selected experiences and retrieval diagnostics."""
@@ -1138,7 +1147,7 @@ def select_experiences_with_details(
     del harmful_label
     normalized = normalize_experience_bank(experiences)
     if max_experiences <= 0:
-        decision = routing_decision or route_experience_buckets_by_version(problem, router_version=router_version)
+        decision = routing_decision or route_experience_buckets_by_mode(problem, router_mode=router_mode)
         return decision, {}, {"used_mixed_retrieval": False, "primary_selected_count": 0, "secondary_selected_count": 0}
 
     if bucket in CATEGORY_KEYS:
@@ -1157,7 +1166,7 @@ def select_experiences_with_details(
     elif routing_decision is not None:
         decision = routing_decision
     else:
-        decision = route_experience_buckets_by_version(problem, router_version=router_version)
+        decision = route_experience_buckets_by_mode(problem, router_mode=router_mode)
 
     secondary_bucket = None
     if (

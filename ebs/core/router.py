@@ -1,7 +1,6 @@
-"""Experimental Router V2 candidate logic for offline development.
+"""Rule-based routing logic for EBS experience selection.
 
-This module preserves the frozen legacy router and exposes a separate
-``v2_rule`` path for router-only development. The implementation remains
+This module implements the default EBS router. The implementation remains
 lightweight and deterministic: no LLM calls, no judge calls, no learned
 classifier, and no benchmark labels at inference time.
 """
@@ -229,8 +228,8 @@ _BENIGN_EXPLANATORY_HINTS = (
 
 
 @dataclass(slots=True, frozen=True)
-class V2RuleConfig:
-    """Experimental V2 rule-router configuration."""
+class RuleRouterConfig:
+    """Rule-based router configuration."""
 
     strong_gap: float = 2.0
     certainty_epsilon: float = 1e-8
@@ -261,14 +260,14 @@ def _ranked_categories(scores: dict[str, float]) -> list[tuple[str, float]]:
     return sorted(scores.items(), key=lambda item: (-item[1], ("harmful", "ethics", "benign").index(item[0])))
 
 
-def route_experience_buckets_v2_rule_with_trace(
+def route_experience_buckets_rule_with_trace(
     problem: str,
     *,
-    config: V2RuleConfig | None = None,
+    config: RuleRouterConfig | None = None,
 ) -> tuple[RoutingDecision, dict[str, Any]]:
-    """Return the V2-Rule decision plus interpretable trace metadata."""
+    """Return the rule-based routing decision plus interpretable trace metadata."""
 
-    cfg = config or V2RuleConfig()
+    cfg = config or RuleRouterConfig()
     normalized = _normalize_problem(problem)
     if not normalized:
         decision = RoutingDecision(
@@ -501,16 +500,16 @@ def route_experience_buckets_v2_rule_with_trace(
         "zero_score": zero_score,
         "tie_buckets": tie_candidates if len(tie_candidates) > 1 else (),
         "normalized_scores": normalized_scores,
-        "router_version": "v2_rule",
+        "router_mode": "rule",
     }
     return decision, trace
 
 
-def route_experience_buckets_v2_rule(
+def route_experience_buckets_rule(
     problem: str,
     *,
-    config: V2RuleConfig | None = None,
+    config: RuleRouterConfig | None = None,
 ) -> RoutingDecision:
-    """Return only the V2-Rule routing decision."""
+    """Return only the rule-based routing decision."""
 
-    return route_experience_buckets_v2_rule_with_trace(problem, config=config)[0]
+    return route_experience_buckets_rule_with_trace(problem, config=config)[0]

@@ -150,7 +150,7 @@ uv run python ebs/train.py \
 - `--dataset`：评测数据。
 - `--dataset_truncate`：只运行前 N 条数据。
 - `--experience_file`：经验库文件。
-- `--router_version`：默认使用 `v2_rule`；`legacy` 仅用于受控对照。
+- `--router`：`rule` 为 EBS 默认的规则路由；`legacy` 仅用于受控对照。
 - `--rollout_concurrency`：并发数。
 - `--rollout_model`：目标模型。
 - `--judge_model`：Judge 模型。

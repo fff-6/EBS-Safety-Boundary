@@ -22,6 +22,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from ebs.core.experience_bank import normalize_router_mode  # noqa: E402
 from eval_scripts.eval_ebs_redbench import (  # noqa: E402
     _HELPERS,
     DEFAULT_CONFIG_PATH,
@@ -233,11 +234,19 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--experience_file", type=str, default=None, help="Optional generated EBS experience JSON.")
     parser.add_argument(
+        "--router",
+        dest="router_mode",
+        type=normalize_router_mode,
+        default="rule",
+        choices=["rule", "legacy"],
+        help="Router mode: rule (default EBS router) or legacy (controlled comparisons).",
+    )
+    parser.add_argument(
         "--router_version",
-        type=str,
-        default="v2_rule",
-        choices=["legacy", "v2_rule"],
-        help="Router implementation used for every EBS routing call.",
+        dest="router_mode",
+        type=normalize_router_mode,
+        choices=["rule", "legacy"],
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--experience_top_k",
@@ -458,7 +467,7 @@ def main() -> None:
             experience_token_budget=args.experience_token_budget,
             attack_methods=MAIN_ATTACK_METHODS,
             xstest_official=xstest_official,
-            router_version=args.router_version,
+            router_mode=args.router_mode,
         )
     )
     metrics = save_main_metric_outputs(summary, effective_output_dir, args.experiment_name)

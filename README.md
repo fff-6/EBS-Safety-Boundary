@@ -153,7 +153,7 @@ Use `ebs/main.py` to run EBS on a local dataset.
 - `--dataset`: Evaluation data.
 - `--dataset_truncate`: Run only the first N samples.
 - `--experience_file`: Experience-bank file.
-- `--router_version`: `v2_rule` (default) or `legacy` for controlled comparisons.
+- `--router`: `rule` (the default EBS rule-based router) or `legacy` for controlled comparisons.
 - `--rollout_concurrency`: Number of concurrent tasks.
 - `--rollout_model`: Target model override.
 - `--judge_model`: Judge model override.

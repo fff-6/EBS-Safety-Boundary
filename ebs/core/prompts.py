@@ -3,7 +3,7 @@ import time
 from ebs.core.experience_bank import (
     CATEGORY_KEYS,
     format_experiences_for_prompt,
-    route_experience_buckets_by_version,
+    route_experience_buckets_by_mode,
     select_experiences,
     select_experiences_with_details,
 )
@@ -100,7 +100,7 @@ def build_ebs_prompt(
     experiences: dict[str, str] | None = None,
     bucket: str | None = None,
     *,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
 ) -> str:
     """Build the EBS prompt with the selected dynamic experiences."""
 
@@ -108,7 +108,7 @@ def build_ebs_prompt(
         experiences or {},
         problem=problem,
         bucket=bucket,
-        router_version=router_version,
+        router_mode=router_mode,
     )
     formatted_experiences = format_experiences_for_prompt(selected_experiences)
     return PROBLEM_WITH_EXPERIENCE_TEMPLATE.format(
@@ -124,7 +124,7 @@ def build_ebs_prompt_with_metrics(
     bucket: str | None = None,
     *,
     disable_experience_retrieval: bool = False,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
 ) -> tuple[str, dict[str, float | str | None]]:
     """Build EBS prompt and return routing/retrieval timing metrics."""
 
@@ -134,7 +134,7 @@ def build_ebs_prompt_with_metrics(
         route_confidence = None
         decision = None
     else:
-        decision = route_experience_buckets_by_version(problem, router_version=router_version)
+        decision = route_experience_buckets_by_mode(problem, router_mode=router_mode)
         selected_bucket = decision.primary_bucket
         route_confidence = decision.confidence
     route_end = time.perf_counter()
@@ -153,7 +153,7 @@ def build_ebs_prompt_with_metrics(
             experiences or {},
             problem=problem,
             bucket=effective_bucket,
-            router_version=router_version,
+            router_mode=router_mode,
             routing_decision=decision,
         )
         selected_bucket = decision.primary_bucket
@@ -166,8 +166,8 @@ def build_ebs_prompt_with_metrics(
     )
     metrics = {
         "selected_bucket": selected_bucket,
-        "router_version_requested": router_version,
-        "router_version_executed": router_version,
+        "router_mode_requested": router_mode,
+        "router_mode_executed": router_mode,
         "routing_call_count": 1,
         "routing_ms": round((route_end - route_start) * 1000, 3),
         "retrieval_ms": round((retrieval_end - retrieval_start) * 1000, 3),

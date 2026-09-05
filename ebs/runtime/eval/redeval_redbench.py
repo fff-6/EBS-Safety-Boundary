@@ -720,7 +720,7 @@ class RedEvalRunConfig:
     attack_max_tokens: int | None = None
     refuse_max_tokens: int | None = None
     xstest_official: bool = False
-    router_version: str = "v2_rule"
+    router_mode: str = "rule"
 
 
 def load_redbench_records(
@@ -819,7 +819,7 @@ def apply_experience_prompt(
     *,
     top_k: int = DEFAULT_EXPERIENCE_TOP_K,
     token_budget: int = DEFAULT_EXPERIENCE_TOKEN_BUDGET,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
     routing_event: dict[str, Any] | None = None,
 ) -> str:
     """Apply EBS experience prompting when dynamic experiences are available."""
@@ -834,16 +834,16 @@ def apply_experience_prompt(
             bucket=infer_bucket_from_problem(
                 prompt,
                 harmful_label=harmful_label,
-                router_version=router_version,
+                router_mode=router_mode,
             ),
-            router_version=router_version,
+            router_mode=router_mode,
         )
 
     if isinstance(experience_text, str):
         return build_ebs_prompt(
             prompt,
             experiences={"G0": experience_text},
-            router_version=router_version,
+            router_mode=router_mode,
         )
     decision, selected, details = select_experiences_with_details(
         experience_text or {},
@@ -851,12 +851,12 @@ def apply_experience_prompt(
         harmful_label=harmful_label,
         max_experiences=top_k,
         token_budget=token_budget,
-        router_version=router_version,
+        router_mode=router_mode,
     )
     if routing_event is not None:
         routing_event.update(
             _build_routing_event(
-                router_version=router_version,
+                router_mode=router_mode,
                 decision=decision,
                 selected=selected,
                 experience_text=experience_text,
@@ -877,7 +877,7 @@ def apply_xstest_experience_prompt(
     *,
     top_k: int = DEFAULT_EXPERIENCE_TOP_K,
     token_budget: int = DEFAULT_EXPERIENCE_TOKEN_BUDGET,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
     routing_event: dict[str, Any] | None = None,
 ) -> str:
     """Apply an XSTest-specific boundary-calibration prompt with dynamic experiences."""
@@ -890,7 +890,7 @@ def apply_xstest_experience_prompt(
         selected_bucket = infer_bucket_from_problem(
             prompt,
             harmful_label=harmful_label,
-            router_version=router_version,
+            router_mode=router_mode,
         )
         formatted_experiences = format_experiences_for_prompt(selected)
         return XSTEST_EXPERIENCE_TEMPLATE.format(
@@ -904,7 +904,7 @@ def apply_xstest_experience_prompt(
         selected_bucket = infer_bucket_from_problem(
             prompt,
             harmful_label=harmful_label,
-            router_version=router_version,
+            router_mode=router_mode,
         )
     else:
         decision, selected, details = select_experiences_with_details(
@@ -913,13 +913,13 @@ def apply_xstest_experience_prompt(
             harmful_label=harmful_label,
             max_experiences=top_k,
             token_budget=token_budget,
-            router_version=router_version,
+            router_mode=router_mode,
         )
         selected_bucket = decision.primary_bucket
         if routing_event is not None:
             routing_event.update(
                 _build_routing_event(
-                    router_version=router_version,
+                    router_mode=router_mode,
                     decision=decision,
                     selected=selected,
                     experience_text=experience_text,
@@ -937,7 +937,7 @@ def apply_xstest_experience_prompt(
 
 def _build_routing_event(
     *,
-    router_version: str,
+    router_mode: str,
     decision: Any,
     selected: dict[str, str],
     experience_text: dict[str, dict[str, str]],
@@ -952,8 +952,8 @@ def _build_routing_event(
     }
     selected_buckets = [id_to_bucket.get(exp_id, "unknown") for exp_id in selected]
     return {
-        "router_version_requested": router_version,
-        "router_version_executed": router_version,
+        "router_mode_requested": router_mode,
+        "router_mode_executed": router_mode,
         "routing_call_count": 1,
         "primary_bucket": decision.primary_bucket,
         "secondary_bucket": decision.secondary_bucket,
@@ -974,14 +974,14 @@ def _build_routing_event(
     }
 
 
-def _assert_routing_events(events: list[dict[str, Any]], router_version: str) -> None:
+def _assert_routing_events(events: list[dict[str, Any]], router_mode: str) -> None:
     active_events = [event for event in events if event]
     if not active_events:
         return
-    if any(event.get("router_version_requested") != router_version for event in active_events):
-        raise AssertionError(f"Routing request-version mismatch for {router_version}")
-    if any(event.get("router_version_executed") != router_version for event in active_events):
-        raise AssertionError(f"Hidden router-version mismatch for {router_version}")
+    if any(event.get("router_mode_requested") != router_mode for event in active_events):
+        raise AssertionError(f"Requested router mode mismatch for {router_mode}")
+    if any(event.get("router_mode_executed") != router_mode for event in active_events):
+        raise AssertionError(f"Executed router mode mismatch for {router_mode}")
 
 
 def build_attack_points(
@@ -992,7 +992,7 @@ def build_attack_points(
     *,
     experience_top_k: int = DEFAULT_EXPERIENCE_TOP_K,
     experience_token_budget: int = DEFAULT_EXPERIENCE_TOKEN_BUDGET,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
 ) -> list[dict[str, Any]]:
     """Generate attack prompts using RedEval's official attack components."""
     points: list[dict[str, Any]] = []
@@ -1020,11 +1020,11 @@ def build_attack_points(
                     harmful_label=sample["harmful_label"],
                     top_k=experience_top_k,
                     token_budget=experience_token_budget,
-                    router_version=router_version,
+                    router_mode=router_mode,
                     routing_event=event,
                 )
             )
-        _assert_routing_events(routing_events, router_version)
+        _assert_routing_events(routing_events, router_mode)
         points.append(
             {
                 "sample_id": sample["sample_id"],
@@ -1049,7 +1049,7 @@ def build_refuse_points(
     *,
     experience_top_k: int = DEFAULT_EXPERIENCE_TOP_K,
     experience_token_budget: int = DEFAULT_EXPERIENCE_TOKEN_BUDGET,
-    router_version: str = "v2_rule",
+    router_mode: str = "rule",
 ) -> list[dict[str, Any]]:
     """Build benign refusal-evaluation prompts aligned with RedEval's base refuser."""
     points: list[dict[str, Any]] = []
@@ -1062,7 +1062,7 @@ def build_refuse_points(
                 harmful_label=sample["harmful_label"],
                 top_k=experience_top_k,
                 token_budget=experience_token_budget,
-                router_version=router_version,
+                router_mode=router_mode,
                 routing_event=routing_event,
             )
         else:
@@ -1072,10 +1072,10 @@ def build_refuse_points(
                 harmful_label=sample["harmful_label"],
                 top_k=experience_top_k,
                 token_budget=experience_token_budget,
-                router_version=router_version,
+                router_mode=router_mode,
                 routing_event=routing_event,
             )
-        _assert_routing_events([routing_event], router_version)
+        _assert_routing_events([routing_event], router_mode)
         wrapped_prompt = f"Respond to the following query: {prompt}"
         points.append(
             {
@@ -1496,7 +1496,7 @@ def run_redeval_redbench(config: RedEvalRunConfig) -> dict[str, Any]:
                 human_jailbreak_subsets=config.human_jailbreak_subsets,
                 experience_top_k=config.experience_top_k,
                 experience_token_budget=config.experience_token_budget,
-                router_version=config.router_version,
+                router_mode=config.router_mode,
             )
             output_dir = run_dir / "logs" / "attack" / benchmark / method_name / config.target_model.output_name
             run_inference(points, target_llm, attack_sampling_params, checkpoint_dir=output_dir)
@@ -1513,7 +1513,7 @@ def run_redeval_redbench(config: RedEvalRunConfig) -> dict[str, Any]:
             experience_text=experience_text,
             experience_top_k=config.experience_top_k,
             experience_token_budget=config.experience_token_budget,
-            router_version=config.router_version,
+            router_mode=config.router_mode,
         )
         output_dir = run_dir / "logs" / "refuse" / benchmark / "base" / config.target_model.output_name
         run_inference(points, target_llm, refuse_sampling_params, checkpoint_dir=output_dir)
@@ -1538,7 +1538,7 @@ def run_redeval_redbench(config: RedEvalRunConfig) -> dict[str, Any]:
                 method_name="base",
                 experience_top_k=config.experience_top_k,
                 experience_token_budget=config.experience_token_budget,
-                router_version=config.router_version,
+                router_mode=config.router_mode,
             )
             output_dir = (
                 run_dir / "logs" / "xstest_official" / split_name / "XSTest" / "base" / config.target_model.output_name
@@ -1575,7 +1575,7 @@ def run_redeval_redbench(config: RedEvalRunConfig) -> dict[str, Any]:
             "attack_max_tokens": config.attack_max_tokens,
             "refuse_max_tokens": config.refuse_max_tokens,
             "xstest_official_enabled": config.xstest_official,
-            "router_version": config.router_version,
+            "router_mode": config.router_mode,
             "generation_seed": config.target_model.seed,
             "num_xstest_safe_samples": len(xstest_safe_samples),
             "num_xstest_unsafe_contrast_samples": len(xstest_unsafe_samples),

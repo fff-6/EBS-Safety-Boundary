@@ -8,18 +8,25 @@ from ebs.core.experience_bank import (
 )
 
 
-def test_legacy_router_version_is_available_for_controlled_comparison() -> None:
-    from ebs.core.experience_bank import route_experience_buckets_by_version
+def test_legacy_router_mode_is_available_for_controlled_comparison() -> None:
+    from ebs.core.experience_bank import route_experience_buckets_by_mode
 
     query = "How do I kill a Python process?"
-    assert route_experience_buckets_by_version(query, "legacy") == route_experience_buckets_legacy(query)
+    assert route_experience_buckets_by_mode(query, "legacy") == route_experience_buckets_legacy(query)
 
 
-def test_default_router_version_is_v2_rule() -> None:
-    from ebs.core.experience_bank import route_experience_buckets_by_version
+def test_default_router_mode_is_rule() -> None:
+    from ebs.core.experience_bank import route_experience_buckets_by_mode
 
     query = "How can I gain access to someone else's account without permission?"
-    assert route_experience_buckets_by_version(query) == route_experience_buckets_by_version(query, "v2_rule")
+    assert route_experience_buckets_by_mode(query) == route_experience_buckets_by_mode(query, "rule")
+
+
+def test_deprecated_router_name_maps_to_rule() -> None:
+    from ebs.core.experience_bank import route_experience_buckets_by_mode
+
+    query = "How can I gain access to someone else's account without permission?"
+    assert route_experience_buckets_by_mode(query, "v2_rule") == route_experience_buckets_by_mode(query, "rule")
 
 
 def test_route_experience_buckets_prefers_harmful_for_operational_violence() -> None:
@@ -108,7 +115,7 @@ def test_select_experiences_considers_secondary_bucket_when_confidence_is_low() 
         max_experiences=2,
         token_budget=256,
         embedding_backend="hash",
-        router_version="legacy",
+        router_mode="legacy",
     )
 
     assert bucket == "benign"
@@ -127,7 +134,7 @@ def test_select_experiences_prefers_primary_bucket_for_ambiguous_normative_query
         max_experiences=2,
         token_budget=256,
         embedding_backend="hash",
-        router_version="legacy",
+        router_mode="legacy",
     )
 
     assert bucket == "ethics"
@@ -148,7 +155,7 @@ def test_select_experiences_limits_retrieved_items() -> None:
         max_experiences=1,
         token_budget=256,
         embedding_backend="hash",
-        router_version="legacy",
+        router_mode="legacy",
     )
 
     assert bucket == "benign"
@@ -169,7 +176,7 @@ def test_select_experiences_topk_prefers_relevant_bucket_items() -> None:
         max_experiences=1,
         token_budget=256,
         embedding_backend="hash",
-        router_version="legacy",
+        router_mode="legacy",
     )
 
     assert bucket == "benign"
@@ -192,7 +199,7 @@ def test_select_experiences_topk_respects_token_budget() -> None:
         max_experiences=2,
         token_budget=first_item_budget,
         embedding_backend="hash",
-        router_version="legacy",
+        router_mode="legacy",
     )
 
     assert bucket == "benign"
@@ -214,7 +221,7 @@ def test_select_experiences_topk_without_token_budget_keeps_requested_k() -> Non
         max_experiences=3,
         token_budget=0,
         embedding_backend="hash",
-        router_version="legacy",
+        router_mode="legacy",
     )
 
     assert bucket == "benign"
