@@ -3,7 +3,7 @@
 EBS is a training-free safety-boundary calibration method that uses repeated rollouts, general and risk-aware evaluation, and critique to distill effective strategies for harmful, benign, and ethical requests into categorized experience banks.
 At inference time, it routes each request, retrieves relevant experiences, and injects them as context to strengthen harmful-request refusal while reducing over-refusal of benign requests without updating model parameters.
 
-## 馃殌 Getting Started
+## Getting Started
 
 Follow the steps below to configure the environment, build an experience bank, and run the complete experiment workflow.
 
